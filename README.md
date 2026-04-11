@@ -129,6 +129,7 @@ JWT_REFRESH_SECRET=your_refresh_secret
 ```bash
 npx prisma migrate dev --name init
 npx prisma generate
+npm run seed
 ```
 
 ---
@@ -199,6 +200,11 @@ Implemented flows:
 - Forgot/reset password flow (`/api/auth/forgot-password`, `/api/auth/reset-password`)
 - RBAC middleware for protected routes (auth, role, and permission checks)
 - Auth endpoint rate limiting and CORS allowlist support via env config
+
+Default seeded admin for frontend testing:
+
+- Email: `admin@medsphere.local`
+- Password: `Admin1234!Pass`
 
 ---
 
