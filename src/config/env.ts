@@ -8,4 +8,5 @@ export const env = {
     databaseUrl: process.env.DATABASE_URL || '',
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET || '',
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || '',
+    frontendOrigins: process.env.FRONTEND_ORIGINS || '',
 };

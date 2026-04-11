@@ -1,6 +1,7 @@
 import { CreateDepartmentHandler } from '../../src/modules/departments/application/handlers/create-department.handler';
 import { CreateDepartmentCommand } from '../../src/modules/departments/application/commands/create-department.command';
 import { DepartmentRepository } from '../../src/modules/departments/domain/department.repository';
+import { DepartmentService } from '../../src/modules/departments/services/department.service';
 import { AppError } from '../../src/shared/core/errors/app-error';
 
 describe('CreateDepartmentHandler', () => {
@@ -25,7 +26,8 @@ describe('CreateDepartmentHandler', () => {
             updatedAt: new Date(),
         });
 
-        const handler = new CreateDepartmentHandler(repository);
+        const service = new DepartmentService(repository);
+        const handler = new CreateDepartmentHandler(service);
         const command = new CreateDepartmentCommand('Cardiology', 'Heart department');
 
         const result = await handler.execute(command);
@@ -48,7 +50,8 @@ describe('CreateDepartmentHandler', () => {
             updatedAt: new Date(),
         });
 
-        const handler = new CreateDepartmentHandler(repository);
+        const service = new DepartmentService(repository);
+        const handler = new CreateDepartmentHandler(service);
         const command = new CreateDepartmentCommand('Cardiology');
 
         await expect(handler.execute(command)).rejects.toBeInstanceOf(AppError);

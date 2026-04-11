@@ -1,0 +1,201 @@
+import { Request, Response } from 'express';
+import { z } from 'zod';
+import { AuthService } from '../services/auth.service';
+import { UserPrismaRepository } from '../../users/infrastructure/user.prisma.repository';
+import { AuthPrismaRepository } from '../infrastructure/auth.prisma.repository';
+import { AuditLogPrismaRepository } from '../../audit-logs/infrastructure/audit-log.prisma.repository';
+import { AuditLogService } from '../../audit-logs/services/audit-log.service';
+import { PasswordService } from '../../../shared/services/password.service';
+import { JwtService } from '../../../shared/services/jwt.service';
+import { TokenHashService } from '../../../shared/services/token-hash.service';
+
+const registerSchema = z.object({
+    firstName: z.string().min(2).max(100),
+    lastName: z.string().min(2).max(100),
+    email: z.email(),
+    password: z.string().min(12).max(100),
+    phone: z.string().optional(),
+    dateOfBirth: z.string().optional(),
+    gender: z.string().optional(),
+    personalNumber: z.string().optional(),
+});
+
+const loginSchema = z.object({
+    email: z.email(),
+    password: z.string().min(1),
+});
+
+const refreshSchema = z.object({
+    refreshToken: z.string().min(1),
+});
+
+const verifyEmailSchema = z.object({
+    token: z.string().min(1),
+});
+
+const resendVerificationSchema = z.object({
+    email: z.email(),
+});
+
+const forgotPasswordSchema = z.object({
+    email: z.email(),
+});
+
+const resetPasswordSchema = z.object({
+    token: z.string().min(1),
+    newPassword: z.string().min(12).max(100),
+});
+
+const logoutSchema = z.object({
+    refreshToken: z.string().min(1),
+});
+
+export class AuthController {
+    private readonly service = new AuthService(
+        new UserPrismaRepository(),
+        new AuthPrismaRepository(),
+        new PasswordService(),
+        new JwtService(),
+        new TokenHashService(),
+        new AuditLogService(new AuditLogPrismaRepository()),
+    );
+
+    async register(req: Request, res: Response) {
+        const body = registerSchema.parse(req.body);
+
+        const result = await this.service.registerPatient({
+            firstName: body.firstName,
+            lastName: body.lastName,
+            email: body.email,
+            password: body.password,
+            phone: body.phone,
+            dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
+            gender: body.gender,
+            personalNumber: body.personalNumber,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(201).json(result);
+    }
+
+    async login(req: Request, res: Response) {
+        const body = loginSchema.parse(req.body);
+
+        const result = await this.service.login({
+            email: body.email,
+            password: body.password,
+            deviceInfo: req.headers['user-agent'],
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async refresh(req: Request, res: Response) {
+        const body = refreshSchema.parse(req.body);
+
+        const result = await this.service.refresh({
+            refreshToken: body.refreshToken,
+            deviceInfo: req.headers['user-agent'],
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async verifyEmail(req: Request, res: Response) {
+        const body = verifyEmailSchema.parse(req.body);
+
+        const result = await this.service.verifyEmail({
+            token: body.token,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async resendVerification(req: Request, res: Response) {
+        const body = resendVerificationSchema.parse(req.body);
+
+        const result = await this.service.resendVerificationEmail({
+            email: body.email,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async forgotPassword(req: Request, res: Response) {
+        const body = forgotPasswordSchema.parse(req.body);
+
+        const result = await this.service.requestPasswordReset({
+            email: body.email,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async resetPassword(req: Request, res: Response) {
+        const body = resetPasswordSchema.parse(req.body);
+
+        const result = await this.service.resetPassword({
+            token: body.token,
+            newPassword: body.newPassword,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async logout(req: Request, res: Response) {
+        const body = logoutSchema.parse(req.body);
+
+        const result = await this.service.logout({
+            refreshToken: body.refreshToken,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async me(req: Request, res: Response) {
+        const result = await this.service.me(req.user!.id);
+        return res.status(200).json(result);
+    }
+
+    async sessions(req: Request, res: Response) {
+        const result = await this.service.getSessions(req.user!.id);
+        return res.status(200).json(result);
+    }
+
+    async revokeSession(req: Request<{ id: string }>, res: Response) {
+        const result = await this.service.revokeSession({
+            userId: req.user!.id,
+            sessionId: req.params.id,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async revokeSessionAsAdmin(req: Request<{ id: string }>, res: Response) {
+        const result = await this.service.revokeSessionAsAdmin({
+            actorUserId: req.user!.id,
+            sessionId: req.params.id,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+}

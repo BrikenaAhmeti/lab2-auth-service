@@ -188,14 +188,17 @@ Each module follows:
 
 ---
 
-## Authentication (Planned)
+## Authentication
 
-This template is designed to support:
+Implemented flows:
 
-- JWT authentication
-- Refresh token rotation
-- Role-based access control (RBAC)
-- Permission guards
+- Patient registration with strong password rules (12+ chars, upper/lower/number/special)
+- Email verification token flow (`/api/auth/verify-email`, `/api/auth/resend-verification`)
+- Login with JWT access token (15 minutes) + refresh token (7 days)
+- Refresh token hashing, rotation, revocation, and active session listing/revocation
+- Forgot/reset password flow (`/api/auth/forgot-password`, `/api/auth/reset-password`)
+- RBAC middleware for protected routes (auth, role, and permission checks)
+- Auth endpoint rate limiting and CORS allowlist support via env config
 
 ---
 
