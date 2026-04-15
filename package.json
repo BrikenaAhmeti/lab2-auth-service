@@ -9,6 +9,8 @@
     "start": "node dist/server.js",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
+    "test:unit": "jest --runInBand tests/unit",
+    "test:auth": "jest --runInBand tests/unit/auth.service.spec.ts",
     "seed": "ts-node prisma/seed.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
