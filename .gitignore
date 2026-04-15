@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build / Output
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Prisma
+prisma/migrations/
+src/generated/
+
+# Coverage
+coverage/
+
+# Temp files
+tmp/
+temp/
+
+# Jest cache
+jest-cache/
+
+# TypeScript
+*.tsbuildinfo
