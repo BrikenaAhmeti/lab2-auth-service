@@ -19,6 +19,8 @@ const PERMISSIONS = [
     { name: 'permissions:manage', scope: 'all' },
     { name: 'departments:read', scope: 'all' },
     { name: 'departments:manage', scope: 'all' },
+    { name: 'services:read', scope: 'all' },
+    { name: 'services:manage', scope: 'all' },
 ] as const;
 
 async function ensureRoles() {
@@ -49,40 +51,46 @@ async function ensurePermissions() {
     }
 }
 
-async function ensureSuperAdminRolePermissions() {
-    const superAdminRole = await prisma.role.findUnique({
-        where: { name: 'Super Admin' },
+async function ensureAdminRolePermissions() {
+    const roles = await prisma.role.findMany({
+        where: {
+            name: {
+                in: ['Admin', 'Super Admin'],
+            },
+        },
     });
 
-    if (!superAdminRole) {
-        throw new Error('Super Admin role not found after seeding roles');
+    if (roles.length !== 2) {
+        throw new Error('Admin roles not found after seeding roles');
     }
 
-    for (const item of PERMISSIONS) {
-        const permission = await prisma.permission.findUnique({
-            where: { name: item.name },
-        });
+    for (const role of roles) {
+        for (const item of PERMISSIONS) {
+            const permission = await prisma.permission.findUnique({
+                where: { name: item.name },
+            });
 
-        if (!permission) {
-            throw new Error(`Permission ${item.name} not found after seeding permissions`);
-        }
+            if (!permission) {
+                throw new Error(`Permission ${item.name} not found after seeding permissions`);
+            }
 
-        const existing = await prisma.rolePermission.findFirst({
-            where: {
-                roleId: superAdminRole.id,
-                permissionId: permission.id,
-                scope: item.scope,
-            },
-        });
-
-        if (!existing) {
-            await prisma.rolePermission.create({
-                data: {
-                    roleId: superAdminRole.id,
+            const existing = await prisma.rolePermission.findFirst({
+                where: {
+                    roleId: role.id,
                     permissionId: permission.id,
                     scope: item.scope,
                 },
             });
+
+            if (!existing) {
+                await prisma.rolePermission.create({
+                    data: {
+                        roleId: role.id,
+                        permissionId: permission.id,
+                        scope: item.scope,
+                    },
+                });
+            }
         }
     }
 }
@@ -140,7 +148,7 @@ async function ensureDefaultAdminUser() {
 async function main() {
     await ensureRoles();
     await ensurePermissions();
-    await ensureSuperAdminRolePermissions();
+    await ensureAdminRolePermissions();
     const user = await ensureDefaultAdminUser();
 
     console.log('Seed complete.');
