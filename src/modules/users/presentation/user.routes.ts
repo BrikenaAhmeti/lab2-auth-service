@@ -6,6 +6,14 @@ const controller = new UserController();
 
 export const userRoutes = Router();
 
+userRoutes.get('/doctors', authMiddleware, async (req, res, next) => {
+    try {
+        await controller.getDoctors(req, res);
+    } catch (error) {
+        next(error);
+    }
+});
+
 userRoutes.get('/me', authMiddleware, async (req, res, next) => {
     try {
         await controller.me(req, res);

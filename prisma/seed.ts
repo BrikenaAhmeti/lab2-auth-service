@@ -8,6 +8,13 @@ const DEFAULT_ADMIN = {
     password: 'Admin1234!Pass',
 };
 
+const DEFAULT_DOCTOR = {
+    firstName: 'Emily',
+    lastName: 'Johnson',
+    email: 'doctor@medsphere.local',
+    password: 'Doctor1234!Pass',
+};
+
 const ROLE_NAMES = ['Super Admin', 'Admin', 'Doctor', 'Nurse', 'Patient'] as const;
 
 const PERMISSIONS = [
@@ -145,15 +152,68 @@ async function ensureDefaultAdminUser() {
     return user;
 }
 
+async function ensureDefaultDoctorUser() {
+    const passwordHash = await bcrypt.hash(DEFAULT_DOCTOR.password, 12);
+    const now = new Date();
+
+    const user = await prisma.user.upsert({
+        where: { email: DEFAULT_DOCTOR.email },
+        update: {
+            firstName: DEFAULT_DOCTOR.firstName,
+            lastName: DEFAULT_DOCTOR.lastName,
+            passwordHash,
+            isActive: true,
+            emailVerifiedAt: now,
+        },
+        create: {
+            firstName: DEFAULT_DOCTOR.firstName,
+            lastName: DEFAULT_DOCTOR.lastName,
+            email: DEFAULT_DOCTOR.email,
+            passwordHash,
+            isActive: true,
+            emailVerifiedAt: now,
+        },
+    });
+
+    const doctorRole = await prisma.role.findUnique({
+        where: { name: 'Doctor' },
+    });
+
+    if (!doctorRole) {
+        throw new Error('Doctor role not found');
+    }
+
+    const existingUserRole = await prisma.userRole.findFirst({
+        where: {
+            userId: user.id,
+            roleId: doctorRole.id,
+        },
+    });
+
+    if (!existingUserRole) {
+        await prisma.userRole.create({
+            data: {
+                userId: user.id,
+                roleId: doctorRole.id,
+            },
+        });
+    }
+
+    return user;
+}
+
 async function main() {
     await ensureRoles();
     await ensurePermissions();
     await ensureAdminRolePermissions();
     const user = await ensureDefaultAdminUser();
+    const doctor = await ensureDefaultDoctorUser();
 
     console.log('Seed complete.');
     console.log(`Admin email: ${user.email}`);
     console.log(`Admin password: ${DEFAULT_ADMIN.password}`);
+    console.log(`Doctor email: ${doctor.email}`);
+    console.log(`Doctor password: ${DEFAULT_DOCTOR.password}`);
     console.log('Please change this password after first login.');
 }
 

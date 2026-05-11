@@ -24,6 +24,29 @@ export class UserPrismaRepository implements UserRepository {
         });
     }
 
+    async findDoctors(): Promise<any[]> {
+        return prisma.user.findMany({
+            where: {
+                isActive: true,
+                userRoles: {
+                    some: {
+                        role: {
+                            name: 'Doctor',
+                        },
+                    },
+                },
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                avatarFileId: true,
+            },
+        });
+    }
+
     async updateMyProfile(userId: string, data: UpdateMyProfileData): Promise<any> {
         return prisma.user.update({
             where: { id: userId },

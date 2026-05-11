@@ -8,6 +8,7 @@ function createMocks() {
         create: jest.fn(),
         findById: jest.fn(),
         findByEmail: jest.fn(),
+        findDoctors: jest.fn(),
         updateMyProfile: jest.fn(),
     };
 
@@ -83,6 +84,8 @@ describe('AuthService', () => {
         m.authRepository.getUserAuthByEmail.mockResolvedValue({
             id: 'u1',
             email: 'admin@medsphere.local',
+            firstName: 'Admin',
+            lastName: 'User',
             passwordHash: 'hashed',
             isActive: true,
             roles: ['Super Admin'],
@@ -119,6 +122,8 @@ describe('AuthService', () => {
         m.authRepository.getUserAuthByEmail.mockResolvedValue({
             id: 'u1',
             email: 'patient@demo.local',
+            firstName: 'Patient',
+            lastName: 'User',
             passwordHash: 'hashed',
             isActive: false,
             roles: ['Patient'],
@@ -154,6 +159,8 @@ describe('AuthService', () => {
         m.authRepository.getUserAuthById.mockResolvedValue({
             id: 'u1',
             email: 'admin@medsphere.local',
+            firstName: 'Admin',
+            lastName: 'User',
             passwordHash: 'hashed',
             isActive: true,
             roles: ['Super Admin'],

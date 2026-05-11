@@ -18,6 +18,10 @@ export class UserService {
         return user;
     }
 
+    async getDoctors() {
+        return this.userRepository.findDoctors();
+    }
+
     async updateMyProfile(
         userId: string,
         data: {

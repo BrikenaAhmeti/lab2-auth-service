@@ -199,6 +199,8 @@ export class AuthService {
             user: {
                 id: user.id,
                 email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
                 roles: user.roles,
                 permissions: user.permissions,
             },
@@ -274,6 +276,8 @@ export class AuthService {
             user: {
                 id: user.id,
                 email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
                 roles: user.roles,
                 permissions: user.permissions,
             },
@@ -317,6 +321,8 @@ export class AuthService {
         return {
             id: user.id,
             email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
             roles: user.roles,
             permissions: user.permissions,
         };

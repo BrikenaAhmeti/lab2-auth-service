@@ -25,6 +25,11 @@ export class UserController {
         return res.status(200).json(result);
     }
 
+    async getDoctors(req: Request, res: Response) {
+        const result = await this.service.getDoctors();
+        return res.status(200).json(result);
+    }
+
     async updateMe(req: Request, res: Response) {
         const body = updateMeSchema.parse(req.body);
 

@@ -27,5 +27,6 @@ export interface UserRepository {
     create(data: CreateUserData): Promise<any>;
     findById(id: string): Promise<any | null>;
     findByEmail(email: string): Promise<any | null>;
+    findDoctors(): Promise<any[]>;
     updateMyProfile(userId: string, data: UpdateMyProfileData): Promise<any>;
 }

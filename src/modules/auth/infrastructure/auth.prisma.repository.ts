@@ -23,6 +23,8 @@ function mapAuthUser(user: any): AuthUserView {
     return {
         id: user.id,
         email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
         passwordHash: user.passwordHash,
         isActive: user.isActive,
         roles: user.userRoles.map((x: any) => x.role.name),

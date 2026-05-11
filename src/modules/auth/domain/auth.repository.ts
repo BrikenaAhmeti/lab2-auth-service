@@ -16,6 +16,8 @@ export interface CreateOneTimeTokenData {
 export interface AuthUserView {
     id: string;
     email: string;
+    firstName: string;
+    lastName: string;
     passwordHash: string;
     isActive: boolean;
     roles: string[];
