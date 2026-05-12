@@ -8,6 +8,7 @@ import { AuditLogService } from '../../audit-logs/services/audit-log.service';
 import { PasswordService } from '../../../shared/services/password.service';
 import { JwtService } from '../../../shared/services/jwt.service';
 import { TokenHashService } from '../../../shared/services/token-hash.service';
+import { createEmailService } from '../../../shared/services/email.service';
 
 const registerSchema = z.object({
     firstName: z.string().min(2).max(100),
@@ -50,6 +51,23 @@ const logoutSchema = z.object({
     refreshToken: z.string().min(1),
 });
 
+const changePasswordSchema = z.object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(12).max(100),
+});
+
+const createAdminUserSchema = z.object({
+    firstName: z.string().min(2).max(100),
+    lastName: z.string().min(2).max(100),
+    email: z.email(),
+    password: z.string().min(12).max(100),
+    roles: z.array(z.string().min(1)).min(1),
+    phone: z.string().optional(),
+    dateOfBirth: z.string().optional(),
+    gender: z.string().optional(),
+    personalNumber: z.string().optional(),
+});
+
 export class AuthController {
     private readonly service = new AuthService(
         new UserPrismaRepository(),
@@ -58,6 +76,7 @@ export class AuthController {
         new JwtService(),
         new TokenHashService(),
         new AuditLogService(new AuditLogPrismaRepository()),
+        createEmailService(),
     );
 
     async register(req: Request, res: Response) {
@@ -197,5 +216,40 @@ export class AuthController {
         });
 
         return res.status(200).json(result);
+    }
+
+    async changePassword(req: Request, res: Response) {
+        const body = changePasswordSchema.parse(req.body);
+
+        const result = await this.service.changePassword({
+            userId: req.user!.id,
+            currentPassword: body.currentPassword,
+            newPassword: body.newPassword,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async createAdminUser(req: Request, res: Response) {
+        const body = createAdminUserSchema.parse(req.body);
+
+        const result = await this.service.createAdminUser({
+            actorUserId: req.user!.id,
+            firstName: body.firstName,
+            lastName: body.lastName,
+            email: body.email,
+            password: body.password,
+            roles: body.roles,
+            phone: body.phone,
+            dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
+            gender: body.gender,
+            personalNumber: body.personalNumber,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(201).json(result);
     }
 }

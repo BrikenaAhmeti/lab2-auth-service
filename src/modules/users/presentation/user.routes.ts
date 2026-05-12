@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { UserController } from './user.controller';
 import { authMiddleware } from '../../../shared/middleware/auth.middleware';
+import { requirePermission } from '../../../shared/middleware/require-permission';
 
 const controller = new UserController();
 
@@ -14,7 +15,7 @@ userRoutes.get('/doctors', authMiddleware, async (req, res, next) => {
     }
 });
 
-userRoutes.get('/me', authMiddleware, async (req, res, next) => {
+userRoutes.get('/me', authMiddleware, requirePermission('users:read', 'own'), async (req, res, next) => {
     try {
         await controller.me(req, res);
     } catch (error) {
@@ -22,7 +23,7 @@ userRoutes.get('/me', authMiddleware, async (req, res, next) => {
     }
 });
 
-userRoutes.patch('/me', authMiddleware, async (req, res, next) => {
+userRoutes.patch('/me', authMiddleware, requirePermission('users:update', 'own'), async (req, res, next) => {
     try {
         await controller.updateMe(req, res);
     } catch (error) {

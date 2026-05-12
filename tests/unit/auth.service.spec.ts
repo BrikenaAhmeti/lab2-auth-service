@@ -2,6 +2,7 @@ import { AppError } from '../../src/shared/core/errors/app-error';
 import { AuthService } from '../../src/modules/auth/services/auth.service';
 import { AuthRepository } from '../../src/modules/auth/domain/auth.repository';
 import { UserRepository } from '../../src/modules/users/domain/user.repository';
+import { EmailService } from '../../src/shared/services/email.service';
 
 function createMocks() {
     const userRepository: jest.Mocked<UserRepository> = {
@@ -33,6 +34,9 @@ function createMocks() {
         findValidPasswordResetToken: jest.fn(),
         markPasswordResetTokenUsed: jest.fn(),
         updateUserPasswordHash: jest.fn(),
+        findRolesByNames: jest.fn(),
+        createUserWithRoles: jest.fn(),
+        assignRolesToUser: jest.fn(),
     };
 
     const passwordService = {
@@ -55,6 +59,10 @@ function createMocks() {
         log: jest.fn(),
     };
 
+    const emailService: jest.Mocked<EmailService> = {
+        send: jest.fn(),
+    };
+
     return {
         userRepository,
         authRepository,
@@ -62,6 +70,7 @@ function createMocks() {
         jwtService,
         tokenHashService,
         auditLogService,
+        emailService,
     };
 }
 
@@ -79,6 +88,7 @@ describe('AuthService', () => {
             m.jwtService as any,
             m.tokenHashService as any,
             m.auditLogService as any,
+            m.emailService,
         );
 
         m.authRepository.getUserAuthByEmail.mockResolvedValue({
@@ -117,6 +127,7 @@ describe('AuthService', () => {
             m.jwtService as any,
             m.tokenHashService as any,
             m.auditLogService as any,
+            m.emailService,
         );
 
         m.authRepository.getUserAuthByEmail.mockResolvedValue({
@@ -147,6 +158,7 @@ describe('AuthService', () => {
             m.jwtService as any,
             m.tokenHashService as any,
             m.auditLogService as any,
+            m.emailService,
         );
 
         m.jwtService.verifyRefreshToken.mockReturnValue({ sub: 'u1' });
@@ -187,6 +199,7 @@ describe('AuthService', () => {
             m.jwtService as any,
             m.tokenHashService as any,
             m.auditLogService as any,
+            m.emailService,
         );
 
         m.jwtService.verifyRefreshToken.mockReturnValue({ sub: 'u1' });
@@ -207,9 +220,12 @@ describe('AuthService', () => {
             m.jwtService as any,
             m.tokenHashService as any,
             m.auditLogService as any,
+            m.emailService,
         );
 
         m.userRepository.findByEmail.mockResolvedValue(null);
+        m.authRepository.findRolesByNames.mockResolvedValue([{ id: 'role-patient', name: 'Patient' }]);
+        m.authRepository.assignRolesToUser.mockResolvedValue();
         m.passwordService.hash.mockResolvedValue('hashed-password');
         m.userRepository.create.mockResolvedValue({
             id: 'u100',
@@ -230,6 +246,8 @@ describe('AuthService', () => {
 
         expect(result.user.email).toBe('john@demo.local');
         expect(m.authRepository.createEmailVerificationToken).toHaveBeenCalled();
+        expect(m.authRepository.assignRolesToUser).toHaveBeenCalledWith('u100', ['role-patient']);
+        expect(m.emailService.send).toHaveBeenCalled();
     });
 
     it('verifies email with valid token', async () => {
@@ -241,6 +259,7 @@ describe('AuthService', () => {
             m.jwtService as any,
             m.tokenHashService as any,
             m.auditLogService as any,
+            m.emailService,
         );
 
         m.tokenHashService.hash.mockReturnValue('verify-hash');
@@ -266,6 +285,7 @@ describe('AuthService', () => {
             m.jwtService as any,
             m.tokenHashService as any,
             m.auditLogService as any,
+            m.emailService,
         );
 
         m.userRepository.findByEmail.mockResolvedValue({
@@ -280,6 +300,7 @@ describe('AuthService', () => {
             email: 'user@demo.local',
         });
         expect(requestResult.success).toBe(true);
+        expect(m.emailService.send).toHaveBeenCalled();
 
         m.authRepository.findValidPasswordResetToken.mockResolvedValue({
             id: 'prt1',
@@ -312,6 +333,7 @@ describe('AuthService', () => {
             m.jwtService as any,
             m.tokenHashService as any,
             m.auditLogService as any,
+            m.emailService,
         );
 
         m.authRepository.revokeRefreshTokenById.mockResolvedValue(false);
@@ -322,5 +344,82 @@ describe('AuthService', () => {
                 sessionId: 'missing-session',
             }),
         ).rejects.toBeInstanceOf(AppError);
+    });
+
+    it('changes password for authenticated user and revokes sessions', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        m.authRepository.getUserAuthById.mockResolvedValue({
+            id: 'u1',
+            email: 'user@demo.local',
+            firstName: 'Demo',
+            lastName: 'User',
+            passwordHash: 'existing-hash',
+            isActive: true,
+            roles: ['Patient'],
+            permissions: ['users:read:own', 'users:update:own'],
+        });
+        m.passwordService.compare.mockResolvedValue(true);
+        m.passwordService.hash.mockResolvedValue('new-hash');
+        m.authRepository.updateUserPasswordHash.mockResolvedValue();
+        m.authRepository.revokeAllRefreshTokensByUser.mockResolvedValue(3);
+
+        const result = await service.changePassword({
+            userId: 'u1',
+            currentPassword: 'CurrentPass123!',
+            newPassword: 'ChangedPass123!',
+        });
+
+        expect(result.success).toBe(true);
+        expect(m.authRepository.updateUserPasswordHash).toHaveBeenCalledWith('u1', 'new-hash');
+        expect(m.authRepository.revokeAllRefreshTokensByUser).toHaveBeenCalledWith('u1');
+    });
+
+    it('creates an admin-managed user with assigned roles', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        m.userRepository.findByEmail.mockResolvedValue(null);
+        m.authRepository.findRolesByNames.mockResolvedValue([
+            { id: 'r1', name: 'Doctor' },
+        ]);
+        m.passwordService.hash.mockResolvedValue('admin-created-hash');
+        m.authRepository.createUserWithRoles.mockResolvedValue({
+            id: 'u200',
+            email: 'doctor2@medsphere.local',
+            firstName: 'Ana',
+            lastName: 'Doctor',
+            isActive: true,
+            roles: ['Doctor'],
+        });
+
+        const result = await service.createAdminUser({
+            actorUserId: 'admin-1',
+            firstName: 'Ana',
+            lastName: 'Doctor',
+            email: 'doctor2@medsphere.local',
+            password: 'DoctorPass123!',
+            roles: ['Doctor'],
+        });
+
+        expect(result.user.roles).toEqual(['Doctor']);
+        expect(m.authRepository.createUserWithRoles).toHaveBeenCalled();
     });
 });

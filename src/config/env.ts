@@ -9,4 +9,7 @@ export const env = {
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET || '',
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || '',
     frontendOrigins: process.env.FRONTEND_ORIGINS || '',
+    appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:3005',
+    emailFrom: process.env.EMAIL_FROM || 'noreply@medsphere.local',
+    resendApiKey: process.env.RESEND_API_KEY || '',
 };

@@ -7,6 +7,18 @@ export interface CreateRefreshTokenData {
     lastUsedAt?: Date;
 }
 
+export interface CreateAdminUserData {
+    firstName: string;
+    lastName: string;
+    email: string;
+    passwordHash: string;
+    phone?: string;
+    dateOfBirth?: Date;
+    gender?: string;
+    personalNumber?: string;
+    createdBy?: string;
+}
+
 export interface CreateOneTimeTokenData {
     userId: string;
     tokenHash: string;
@@ -45,4 +57,17 @@ export interface AuthRepository {
     findValidPasswordResetToken(tokenHash: string): Promise<any | null>;
     markPasswordResetTokenUsed(id: string): Promise<void>;
     updateUserPasswordHash(userId: string, passwordHash: string): Promise<void>;
+    findRolesByNames(names: string[]): Promise<Array<{ id: string; name: string }>>;
+    createUserWithRoles(
+        data: CreateAdminUserData,
+        roleIds: string[],
+    ): Promise<{
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        isActive: boolean;
+        roles: string[];
+    }>;
+    assignRolesToUser(userId: string, roleIds: string[], actorUserId?: string): Promise<void>;
 }

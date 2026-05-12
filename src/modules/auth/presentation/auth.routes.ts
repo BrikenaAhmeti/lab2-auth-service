@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { AuthController } from './auth.controller';
 import { authMiddleware } from '../../../shared/middleware/auth.middleware';
 import { createRateLimiter } from '../../../shared/middleware/rate-limit';
+import { requirePermission } from '../../../shared/middleware/require-permission';
 import { requireRole } from '../../../shared/middleware/require-role';
 
 const controller = new AuthController();
@@ -77,7 +78,7 @@ authRoutes.post('/logout', async (req, res, next) => {
   }
 });
 
-authRoutes.get('/me', authMiddleware, async (req, res, next) => {
+authRoutes.get('/me', authMiddleware, requirePermission('users:read', 'own'), async (req, res, next) => {
   try {
     await controller.me(req as any, res);
   } catch (error) {
@@ -85,7 +86,7 @@ authRoutes.get('/me', authMiddleware, async (req, res, next) => {
   }
 });
 
-authRoutes.get('/sessions', authMiddleware, async (req, res, next) => {
+authRoutes.get('/sessions', authMiddleware, requirePermission('users:read', 'own'), async (req, res, next) => {
   try {
     await controller.sessions(req as any, res);
   } catch (error) {
@@ -93,7 +94,20 @@ authRoutes.get('/sessions', authMiddleware, async (req, res, next) => {
   }
 });
 
-authRoutes.delete('/sessions/:id', authMiddleware, async (req, res, next) => {
+authRoutes.post(
+  '/change-password',
+  authMiddleware,
+  requirePermission('users:update', 'own'),
+  async (req, res, next) => {
+    try {
+      await controller.changePassword(req as any, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+authRoutes.delete('/sessions/:id', authMiddleware, requirePermission('users:update', 'own'), async (req, res, next) => {
   try {
     await controller.revokeSession(req as any, res);
   } catch (error) {
@@ -105,9 +119,24 @@ authRoutes.delete(
   '/admin/sessions/:id',
   authMiddleware,
   requireRole(['Admin', 'Super Admin']),
+  requirePermission('users:deactivate', 'all'),
   async (req, res, next) => {
     try {
       await controller.revokeSessionAsAdmin(req as any, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+authRoutes.post(
+  '/admin/users',
+  authMiddleware,
+  requireRole(['Admin', 'Super Admin']),
+  requirePermission('users:create', 'all'),
+  async (req, res, next) => {
+    try {
+      await controller.createAdminUser(req, res);
     } catch (error) {
       next(error);
     }

@@ -8,6 +8,7 @@ import { notFoundHandler } from './shared/middleware/not-found';
 import { departmentRoutes } from './modules/departments/presentation/department.routes';
 import { authRoutes } from './modules/auth/presentation/auth.routes';
 import { userRoutes } from './modules/users/presentation/user.routes';
+import { swaggerRoutes } from './docs/swagger.routes';
 
 export function createApp() {
     const app = express();
@@ -41,6 +42,7 @@ export function createApp() {
         res.json({ status: 'ok' });
     });
 
+    app.use('/docs', swaggerRoutes);
     app.use('/departments', departmentRoutes);
     app.use('/api/auth', authRoutes);
     app.use('/api/users', userRoutes);

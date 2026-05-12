@@ -120,6 +120,9 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app?schema=public"
 
 JWT_ACCESS_SECRET=your_access_secret
 JWT_REFRESH_SECRET=your_refresh_secret
+APP_BASE_URL=http://localhost:3005
+EMAIL_FROM=noreply@medsphere.local
+RESEND_API_KEY=optional_resend_api_key
 ```
 
 ---
@@ -194,12 +197,21 @@ Each module follows:
 Implemented flows:
 
 - Patient registration with strong password rules (12+ chars, upper/lower/number/special)
+- Admin-managed user/staff account creation with role assignment
 - Email verification token flow (`/api/auth/verify-email`, `/api/auth/resend-verification`)
 - Login with JWT access token (15 minutes) + refresh token (7 days)
 - Refresh token hashing, rotation, revocation, and active session listing/revocation
 - Forgot/reset password flow (`/api/auth/forgot-password`, `/api/auth/reset-password`)
+- Authenticated password change flow (`/api/auth/change-password`)
 - RBAC middleware for protected routes (auth, role, and permission checks)
 - Auth endpoint rate limiting and CORS allowlist support via env config
+- Email delivery via Resend when `RESEND_API_KEY` is configured, with console preview fallback in local development
+
+Auth API artifacts:
+
+- OpenAPI: `docs/openapi/auth.openapi.json`
+- Postman collection: `docs/postman/MedSphere-Auth.postman_collection.json`
+- Swagger UI: `/docs`
 
 Default seeded admin for frontend testing:
 

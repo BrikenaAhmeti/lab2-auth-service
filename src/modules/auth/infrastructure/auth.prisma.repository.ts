@@ -2,6 +2,7 @@ import { prisma } from '../../../infrastructure/db/prisma';
 import {
     AuthRepository,
     CreateOneTimeTokenData,
+    CreateAdminUserData,
     AuthUserView,
     CreateRefreshTokenData,
 } from '../domain/auth.repository';
@@ -283,6 +284,103 @@ export class AuthPrismaRepository implements AuthRepository {
             data: {
                 passwordHash,
             },
+        });
+    }
+
+    async findRolesByNames(names: string[]): Promise<Array<{ id: string; name: string }>> {
+        return prisma.role.findMany({
+            where: {
+                name: {
+                    in: names,
+                },
+            },
+            select: {
+                id: true,
+                name: true,
+            },
+        });
+    }
+
+    async createUserWithRoles(
+        data: CreateAdminUserData,
+        roleIds: string[],
+    ): Promise<{
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        isActive: boolean;
+        roles: string[];
+    }> {
+        const created = await prisma.$transaction(async (tx) => {
+            const now = new Date();
+            const user = await tx.user.create({
+                data: {
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    email: data.email,
+                    passwordHash: data.passwordHash,
+                    phone: data.phone,
+                    dateOfBirth: data.dateOfBirth,
+                    gender: data.gender,
+                    personalNumber: data.personalNumber,
+                    isActive: true,
+                    emailVerifiedAt: now,
+                    createdBy: data.createdBy,
+                    updatedBy: data.createdBy,
+                },
+            });
+
+            await tx.userRole.createMany({
+                data: roleIds.map((roleId) => ({
+                    userId: user.id,
+                    roleId,
+                    createdBy: data.createdBy,
+                    updatedBy: data.createdBy,
+                })),
+            });
+
+            const roles = await tx.role.findMany({
+                where: {
+                    id: {
+                        in: roleIds,
+                    },
+                },
+                select: {
+                    name: true,
+                },
+            });
+
+            return {
+                id: user.id,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                isActive: user.isActive,
+                roles: roles.map((role) => role.name),
+            };
+        });
+
+        return created;
+    }
+
+    async assignRolesToUser(
+        userId: string,
+        roleIds: string[],
+        actorUserId?: string,
+    ): Promise<void> {
+        if (roleIds.length === 0) {
+            return;
+        }
+
+        await prisma.userRole.createMany({
+            data: roleIds.map((roleId) => ({
+                userId,
+                roleId,
+                createdBy: actorUserId,
+                updatedBy: actorUserId,
+            })),
+            skipDuplicates: true,
         });
     }
 }

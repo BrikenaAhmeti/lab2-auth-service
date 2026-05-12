@@ -1,0 +1,152 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MedSphere Auth Service API",
+    "version": "1.0.0",
+    "description": "Authentication and identity endpoints implemented in the auth-service backend."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3005"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "summary": "Register a patient account"
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Authenticate and issue access/refresh tokens"
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "summary": "Rotate refresh token and issue a new access token"
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Revoke a refresh token"
+      }
+    },
+    "/api/auth/verify-email": {
+      "post": {
+        "summary": "Verify account email"
+      }
+    },
+    "/api/auth/resend-verification": {
+      "post": {
+        "summary": "Send a new verification email"
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "summary": "Send password reset email"
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "summary": "Reset password with one-time token"
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "summary": "Change password for the authenticated user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "summary": "Get current auth user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/auth/sessions": {
+      "get": {
+        "summary": "List active sessions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/auth/sessions/{id}": {
+      "delete": {
+        "summary": "Revoke one of the current user's sessions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/auth/admin/sessions/{id}": {
+      "delete": {
+        "summary": "Admin revoke any session",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/auth/admin/users": {
+      "post": {
+        "summary": "Admin create a user/staff identity account",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/me": {
+      "get": {
+        "summary": "Get current user profile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "summary": "Update current user profile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/doctors": {
+      "get": {
+        "summary": "List active doctors",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  }
+}

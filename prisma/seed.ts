@@ -18,17 +18,59 @@ const DEFAULT_DOCTOR = {
 const ROLE_NAMES = ['Super Admin', 'Admin', 'Doctor', 'Nurse', 'Patient'] as const;
 
 const PERMISSIONS = [
-    { name: 'users:read', scope: 'all' },
-    { name: 'users:create', scope: 'all' },
-    { name: 'users:update', scope: 'all' },
-    { name: 'users:deactivate', scope: 'all' },
-    { name: 'roles:manage', scope: 'all' },
-    { name: 'permissions:manage', scope: 'all' },
-    { name: 'departments:read', scope: 'all' },
-    { name: 'departments:manage', scope: 'all' },
-    { name: 'services:read', scope: 'all' },
-    { name: 'services:manage', scope: 'all' },
+    'users:read',
+    'users:create',
+    'users:update',
+    'users:deactivate',
+    'roles:manage',
+    'permissions:manage',
+    'departments:read',
+    'departments:manage',
+    'services:read',
+    'services:manage',
 ] as const;
+
+const ROLE_PERMISSION_SCOPES: Record<
+    (typeof ROLE_NAMES)[number],
+    Array<{ permission: (typeof PERMISSIONS)[number]; scope: 'own' | 'all' }>
+> = {
+    'Super Admin': [
+        { permission: 'users:read', scope: 'all' },
+        { permission: 'users:create', scope: 'all' },
+        { permission: 'users:update', scope: 'all' },
+        { permission: 'users:deactivate', scope: 'all' },
+        { permission: 'roles:manage', scope: 'all' },
+        { permission: 'permissions:manage', scope: 'all' },
+        { permission: 'departments:read', scope: 'all' },
+        { permission: 'departments:manage', scope: 'all' },
+        { permission: 'services:read', scope: 'all' },
+        { permission: 'services:manage', scope: 'all' },
+    ],
+    Admin: [
+        { permission: 'users:read', scope: 'all' },
+        { permission: 'users:create', scope: 'all' },
+        { permission: 'users:update', scope: 'all' },
+        { permission: 'users:deactivate', scope: 'all' },
+        { permission: 'roles:manage', scope: 'all' },
+        { permission: 'permissions:manage', scope: 'all' },
+        { permission: 'departments:read', scope: 'all' },
+        { permission: 'departments:manage', scope: 'all' },
+        { permission: 'services:read', scope: 'all' },
+        { permission: 'services:manage', scope: 'all' },
+    ],
+    Doctor: [
+        { permission: 'users:read', scope: 'own' },
+        { permission: 'users:update', scope: 'own' },
+    ],
+    Nurse: [
+        { permission: 'users:read', scope: 'own' },
+        { permission: 'users:update', scope: 'own' },
+    ],
+    Patient: [
+        { permission: 'users:read', scope: 'own' },
+        { permission: 'users:update', scope: 'own' },
+    ],
+};
 
 async function ensureRoles() {
     for (const roleName of ROLE_NAMES) {
@@ -45,47 +87,43 @@ async function ensureRoles() {
 }
 
 async function ensurePermissions() {
-    for (const item of PERMISSIONS) {
+    for (const permissionName of PERMISSIONS) {
         await prisma.permission.upsert({
-            where: { name: item.name },
+            where: { name: permissionName },
             update: {},
             create: {
-                name: item.name,
-                description: `${item.name} permission`,
+                name: permissionName,
+                description: `${permissionName} permission`,
                 category: 'access',
             },
         });
     }
 }
 
-async function ensureAdminRolePermissions() {
-    const roles = await prisma.role.findMany({
-        where: {
-            name: {
-                in: ['Admin', 'Super Admin'],
-            },
-        },
-    });
+async function ensureRolePermissions() {
+    const roles = await prisma.role.findMany();
+    const roleMap = new Map(roles.map((role) => [role.name, role]));
 
-    if (roles.length !== 2) {
-        throw new Error('Admin roles not found after seeding roles');
-    }
+    for (const [roleName, grants] of Object.entries(ROLE_PERMISSION_SCOPES)) {
+        const role = roleMap.get(roleName);
+        if (!role) {
+            throw new Error(`Role ${roleName} not found after seeding roles`);
+        }
 
-    for (const role of roles) {
-        for (const item of PERMISSIONS) {
+        for (const grant of grants) {
             const permission = await prisma.permission.findUnique({
-                where: { name: item.name },
+                where: { name: grant.permission },
             });
 
             if (!permission) {
-                throw new Error(`Permission ${item.name} not found after seeding permissions`);
+                throw new Error(`Permission ${grant.permission} not found after seeding permissions`);
             }
 
             const existing = await prisma.rolePermission.findFirst({
                 where: {
                     roleId: role.id,
                     permissionId: permission.id,
-                    scope: item.scope,
+                    scope: grant.scope,
                 },
             });
 
@@ -94,7 +132,7 @@ async function ensureAdminRolePermissions() {
                     data: {
                         roleId: role.id,
                         permissionId: permission.id,
-                        scope: item.scope,
+                        scope: grant.scope,
                     },
                 });
             }
@@ -205,7 +243,7 @@ async function ensureDefaultDoctorUser() {
 async function main() {
     await ensureRoles();
     await ensurePermissions();
-    await ensureAdminRolePermissions();
+    await ensureRolePermissions();
     const user = await ensureDefaultAdminUser();
     const doctor = await ensureDefaultDoctorUser();
 

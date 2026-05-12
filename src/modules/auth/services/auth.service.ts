@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { JwtService } from '../../../shared/services/jwt.service';
 import { PasswordService } from '../../../shared/services/password.service';
 import { TokenHashService } from '../../../shared/services/token-hash.service';
+import { EmailService } from '../../../shared/services/email.service';
 import { AuditLogService } from '../../audit-logs/services/audit-log.service';
 import { UserRepository } from '../../users/domain/user.repository';
 import { AuthRepository } from '../domain/auth.repository';
@@ -16,6 +17,7 @@ export class AuthService {
         private readonly jwtService: JwtService,
         private readonly tokenHashService: TokenHashService,
         private readonly auditLogService: AuditLogService,
+        private readonly emailService: EmailService,
     ) { }
 
     private assertPasswordComplexity(password: string) {
@@ -37,6 +39,26 @@ export class AuthService {
         expiresAt.setHours(expiresAt.getHours() + hoursToExpire);
 
         return { rawToken, tokenHash, expiresAt };
+    }
+
+    private async sendVerificationEmail(email: string, token: string) {
+        const verifyUrl = `${env.appBaseUrl}/verify-email?token=${encodeURIComponent(token)}`;
+        await this.emailService.send({
+            to: email,
+            subject: 'Verify your MedSphere account',
+            text: `Verify your MedSphere account by opening: ${verifyUrl}`,
+            html: `<p>Verify your MedSphere account by opening <a href="${verifyUrl}">${verifyUrl}</a>.</p>`,
+        });
+    }
+
+    private async sendPasswordResetEmail(email: string, token: string) {
+        const resetUrl = `${env.appBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+        await this.emailService.send({
+            to: email,
+            subject: 'Reset your MedSphere password',
+            text: `Reset your MedSphere password by opening: ${resetUrl}`,
+            html: `<p>Reset your MedSphere password by opening <a href="${resetUrl}">${resetUrl}</a>.</p>`,
+        });
     }
 
     async registerPatient(input: {
@@ -74,12 +96,19 @@ export class AuthService {
             emailVerifiedAt: null,
         });
 
+        const patientRoles = await this.authRepository.findRolesByNames(['Patient']);
+        if (patientRoles.length !== 1) {
+            throw new AppError('Patient role is not configured', 500);
+        }
+        await this.authRepository.assignRolesToUser(user.id, [patientRoles[0].id]);
+
         const verification = this.createOneTimeToken(24);
         await this.authRepository.createEmailVerificationToken({
             userId: user.id,
             tokenHash: verification.tokenHash,
             expiresAt: verification.expiresAt,
         });
+        await this.sendVerificationEmail(user.email, verification.rawToken);
 
         await this.auditLogService.log({
             userId: user.id,
@@ -104,12 +133,6 @@ export class AuthService {
                 email: user.email,
                 isActive: user.isActive,
             },
-            ...(env.nodeEnv !== 'production'
-                ? {
-                    verificationToken: verification.rawToken,
-                    verificationExpiresAt: verification.expiresAt,
-                }
-                : {}),
         };
     }
 
@@ -436,6 +459,7 @@ export class AuthService {
             tokenHash: verification.tokenHash,
             expiresAt: verification.expiresAt,
         });
+        await this.sendVerificationEmail(user.email, verification.rawToken);
 
         await this.auditLogService.log({
             userId: user.id,
@@ -449,12 +473,6 @@ export class AuthService {
         return {
             success: true,
             message: 'Verification link has been re-issued.',
-            ...(env.nodeEnv !== 'production'
-                ? {
-                    verificationToken: verification.rawToken,
-                    verificationExpiresAt: verification.expiresAt,
-                }
-                : {}),
         };
     }
 
@@ -476,6 +494,7 @@ export class AuthService {
             tokenHash: reset.tokenHash,
             expiresAt: reset.expiresAt,
         });
+        await this.sendPasswordResetEmail(user.email, reset.rawToken);
 
         await this.auditLogService.log({
             userId: user.id,
@@ -489,12 +508,6 @@ export class AuthService {
         return {
             success: true,
             message: 'Password reset link has been issued.',
-            ...(env.nodeEnv !== 'production'
-                ? {
-                    resetToken: reset.rawToken,
-                    resetExpiresAt: reset.expiresAt,
-                }
-                : {}),
         };
     }
 
@@ -528,5 +541,116 @@ export class AuthService {
         });
 
         return { success: true, message: 'Password has been reset successfully.' };
+    }
+
+    async changePassword(input: {
+        userId: string;
+        currentPassword: string;
+        newPassword: string;
+        ipAddress?: string;
+        userAgent?: string;
+    }) {
+        const user = await this.authRepository.getUserAuthById(input.userId);
+        if (!user || !user.isActive) {
+            throw new AppError('User not found', 404);
+        }
+
+        const isValid = await this.passwordService.compare(
+            input.currentPassword,
+            user.passwordHash,
+        );
+
+        if (!isValid) {
+            throw new AppError('Current password is incorrect', 400);
+        }
+
+        this.assertPasswordComplexity(input.newPassword);
+        const passwordHash = await this.passwordService.hash(input.newPassword);
+        await this.authRepository.updateUserPasswordHash(user.id, passwordHash);
+        await this.authRepository.revokeAllRefreshTokensByUser(user.id);
+
+        await this.auditLogService.log({
+            userId: user.id,
+            action: 'password.changed',
+            entity: 'user',
+            entityId: user.id,
+            ipAddress: input.ipAddress,
+            userAgent: input.userAgent,
+        });
+
+        return {
+            success: true,
+            message: 'Password changed successfully. Please sign in again on your devices.',
+        };
+    }
+
+    async createAdminUser(input: {
+        actorUserId: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        password: string;
+        roles: string[];
+        phone?: string;
+        dateOfBirth?: Date;
+        gender?: string;
+        personalNumber?: string;
+        ipAddress?: string;
+        userAgent?: string;
+    }) {
+        const email = input.email.trim().toLowerCase();
+        const existing = await this.userRepository.findByEmail(email);
+        if (existing) {
+            throw new AppError('Email already in use', 409);
+        }
+
+        this.assertPasswordComplexity(input.password);
+
+        const normalizedRoles = Array.from(
+            new Set(input.roles.map((role) => role.trim()).filter(Boolean)),
+        );
+
+        if (normalizedRoles.length === 0) {
+            throw new AppError('At least one role is required', 400);
+        }
+
+        const roles = await this.authRepository.findRolesByNames(normalizedRoles);
+        if (roles.length !== normalizedRoles.length) {
+            throw new AppError('One or more roles are invalid', 400);
+        }
+
+        const passwordHash = await this.passwordService.hash(input.password);
+        const user = await this.authRepository.createUserWithRoles(
+            {
+                firstName: input.firstName.trim(),
+                lastName: input.lastName.trim(),
+                email,
+                passwordHash,
+                phone: input.phone?.trim(),
+                dateOfBirth: input.dateOfBirth,
+                gender: input.gender,
+                personalNumber: input.personalNumber,
+                createdBy: input.actorUserId,
+            },
+            roles.map((role) => role.id),
+        );
+
+        await this.auditLogService.log({
+            userId: input.actorUserId,
+            action: 'user.created.admin',
+            entity: 'user',
+            entityId: user.id,
+            newValue: {
+                email: user.email,
+                roles: user.roles,
+            },
+            ipAddress: input.ipAddress,
+            userAgent: input.userAgent,
+        });
+
+        return {
+            message: 'User account created successfully.',
+            user,
+        };
     }
 }
