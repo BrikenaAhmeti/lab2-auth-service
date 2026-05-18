@@ -41,18 +41,32 @@ export class AuthService {
         return { rawToken, tokenHash, expiresAt };
     }
 
+    private buildTokenUrl(baseUrl: string, token: string) {
+        const url = new URL(baseUrl);
+        url.searchParams.set('token', token);
+        return url.toString();
+    }
+
     private async sendVerificationEmail(email: string, token: string) {
-        const verifyUrl = `${env.appBaseUrl}/verify-email?token=${encodeURIComponent(token)}`;
+        const verifyUrl = this.buildTokenUrl(env.emailVerificationUrl, token);
         await this.emailService.send({
             to: email,
             subject: 'Verify your MedSphere account',
-            text: `Verify your MedSphere account by opening: ${verifyUrl}`,
-            html: `<p>Verify your MedSphere account by opening <a href="${verifyUrl}">${verifyUrl}</a>.</p>`,
+            text: [
+                'Welcome to MedSphere.',
+                `Verify your account by opening this link: ${verifyUrl}`,
+                'This link expires in 24 hours.',
+            ].join('\n\n'),
+            html: [
+                '<p>Welcome to MedSphere.</p>',
+                `<p><a href="${verifyUrl}">Verify your email address</a></p>`,
+                '<p>This link expires in 24 hours.</p>',
+            ].join(''),
         });
     }
 
     private async sendPasswordResetEmail(email: string, token: string) {
-        const resetUrl = `${env.appBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+        const resetUrl = this.buildTokenUrl(env.passwordResetUrl, token);
         await this.emailService.send({
             to: email,
             subject: 'Reset your MedSphere password',

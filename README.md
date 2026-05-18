@@ -121,7 +121,15 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app?schema=public"
 JWT_ACCESS_SECRET=your_access_secret
 JWT_REFRESH_SECRET=your_refresh_secret
 APP_BASE_URL=http://localhost:3005
-EMAIL_FROM=noreply@medsphere.local
+EMAIL_VERIFICATION_URL=http://localhost:3005/api/auth/verify-email
+PASSWORD_RESET_URL=http://localhost:5173/reset-password
+
+EMAIL_FROM=your-gmail@gmail.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-gmail@gmail.com
+SMTP_PASS=your-gmail-app-password-without-spaces
 RESEND_API_KEY=optional_resend_api_key
 ```
 
@@ -205,6 +213,7 @@ Implemented flows:
 - Authenticated password change flow (`/api/auth/change-password`)
 - RBAC middleware for protected routes (auth, role, and permission checks)
 - Auth endpoint rate limiting and CORS allowlist support via env config
+- Email delivery via Gmail/SMTP when `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASS` are configured
 - Email delivery via Resend when `RESEND_API_KEY` is configured, with console preview fallback in local development
 
 Auth API artifacts:

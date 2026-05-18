@@ -46,6 +46,14 @@ authRoutes.post('/verify-email', authRateLimit, async (req, res, next) => {
   }
 });
 
+authRoutes.get('/verify-email', authRateLimit, async (req, res, next) => {
+  try {
+    await controller.verifyEmailLink(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
 authRoutes.post('/resend-verification', authRateLimit, async (req, res, next) => {
   try {
     await controller.resendVerification(req, res);

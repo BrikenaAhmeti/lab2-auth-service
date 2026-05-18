@@ -1,4 +1,5 @@
 import { env } from '../../config/env';
+import nodemailer from 'nodemailer';
 
 export interface SendEmailInput {
     to: string;
@@ -48,7 +49,33 @@ class ResendEmailService implements EmailService {
     }
 }
 
+class SmtpEmailService implements EmailService {
+    private readonly transporter = nodemailer.createTransport({
+        host: env.smtpHost,
+        port: env.smtpPort,
+        secure: env.smtpSecure,
+        auth: {
+            user: env.smtpUser,
+            pass: env.smtpPass,
+        },
+    });
+
+    async send(input: SendEmailInput): Promise<void> {
+        await this.transporter.sendMail({
+            from: env.emailFrom,
+            to: input.to,
+            subject: input.subject,
+            text: input.text,
+            html: input.html,
+        });
+    }
+}
+
 export function createEmailService(): EmailService {
+    if (env.smtpHost && env.smtpUser && env.smtpPass) {
+        return new SmtpEmailService();
+    }
+
     if (env.resendApiKey) {
         return new ResendEmailService();
     }

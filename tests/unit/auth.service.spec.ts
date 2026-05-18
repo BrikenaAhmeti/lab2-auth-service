@@ -248,6 +248,9 @@ describe('AuthService', () => {
         expect(m.authRepository.createEmailVerificationToken).toHaveBeenCalled();
         expect(m.authRepository.assignRolesToUser).toHaveBeenCalledWith('u100', ['role-patient']);
         expect(m.emailService.send).toHaveBeenCalled();
+        expect(m.emailService.send.mock.calls[0][0].text).toContain(
+            'http://localhost:3005/api/auth/verify-email?token=',
+        );
     });
 
     it('verifies email with valid token', async () => {

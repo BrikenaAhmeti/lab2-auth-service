@@ -52,6 +52,29 @@
       }
     },
     {
+      "name": "Verify Email Link",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/verify-email?token={{verificationToken}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "verify-email"
+          ],
+          "query": [
+            {
+              "key": "token",
+              "value": "{{verificationToken}}"
+            }
+          ]
+        }
+      }
+    },
+    {
       "name": "Change Password",
       "request": {
         "method": "POST",
@@ -114,6 +137,10 @@
     },
     {
       "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "verificationToken",
       "value": ""
     }
   ]

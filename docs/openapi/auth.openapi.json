@@ -43,6 +43,9 @@
     "/api/auth/verify-email": {
       "post": {
         "summary": "Verify account email"
+      },
+      "get": {
+        "summary": "Verify account email from emailed link"
       }
     },
     "/api/auth/resend-verification": {

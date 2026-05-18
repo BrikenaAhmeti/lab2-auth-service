@@ -34,6 +34,10 @@ const verifyEmailSchema = z.object({
     token: z.string().min(1),
 });
 
+const verifyEmailQuerySchema = z.object({
+    token: z.string().min(1),
+});
+
 const resendVerificationSchema = z.object({
     email: z.email(),
 });
@@ -130,6 +134,18 @@ export class AuthController {
 
         const result = await this.service.verifyEmail({
             token: body.token,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async verifyEmailLink(req: Request, res: Response) {
+        const query = verifyEmailQuerySchema.parse(req.query);
+
+        const result = await this.service.verifyEmail({
+            token: query.token,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
         });

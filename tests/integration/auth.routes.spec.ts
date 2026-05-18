@@ -89,6 +89,28 @@ describe('Auth routes', () => {
         expect(response.body.user.email).toBe('doctor2@medsphere.local');
     });
 
+    it('verifies email from emailed link query token', async () => {
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+
+        const verifySpy = jest
+            .spyOn(AuthService.prototype, 'verifyEmail')
+            .mockResolvedValue({
+                success: true,
+                message: 'Email verified successfully.',
+            });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const response = await request(app).get('/api/auth/verify-email?token=raw-token');
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+        expect(verifySpy).toHaveBeenCalledWith(
+            expect.objectContaining({ token: 'raw-token' }),
+        );
+    });
+
     it('serves the swagger openapi document', async () => {
         const { createApp } = await import('../../src/app');
         const app = createApp();
