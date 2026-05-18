@@ -1,0 +1,67 @@
+name: medsphere-auth
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medsphere}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medsphere}
+      POSTGRES_DB: ${POSTGRES_DB:-auth_service}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  auth-service-migrate:
+    build:
+      context: .
+      target: build
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-medsphere}:${POSTGRES_PASSWORD:-medsphere}@postgres:5432/${POSTGRES_DB:-auth_service}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
+
+  auth-service:
+    build:
+      context: .
+      target: production
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      DATABASE_URL: postgresql://${POSTGRES_USER:-medsphere}:${POSTGRES_PASSWORD:-medsphere}@postgres:5432/${POSTGRES_DB:-auth_service}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-with-auth-service-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-with-auth-service-refresh-secret}
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:5173}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3005}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@medsphere.local}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+    ports:
+      - "${AUTH_SERVICE_PORT:-3005}:3005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://localhost:3005/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

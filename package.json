@@ -2,11 +2,11 @@
   "name": "backend-template",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/src/server.js",
   "scripts": {
     "dev": "nodemon --watch src --exec tsx src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/src/server.js",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "test:unit": "jest --runInBand tests/unit",
@@ -14,7 +14,12 @@
     "seed": "ts-node prisma/seed.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:infra": "docker compose -f docker-compose.dev.yml up -d",
+    "docker:infra:down": "docker compose -f docker-compose.dev.yml down"
   },
   "keywords": [],
   "author": "",
