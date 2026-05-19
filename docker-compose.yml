@@ -30,6 +30,20 @@ services:
     command: ["npx", "prisma", "migrate", "deploy"]
     restart: "no"
 
+  auth-service-seed:
+    build:
+      context: .
+      target: build
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-medsphere}:${POSTGRES_PASSWORD:-medsphere}@postgres:5432/${POSTGRES_DB:-auth_service}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service-migrate:
+        condition: service_completed_successfully
+    command: ["npm", "run", "seed"]
+    restart: "no"
+
   auth-service:
     build:
       context: .
@@ -40,7 +54,6 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-medsphere}:${POSTGRES_PASSWORD:-medsphere}@postgres:5432/${POSTGRES_DB:-auth_service}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-with-auth-service-access-secret}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-with-auth-service-refresh-secret}
-      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:5173}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3005}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@medsphere.local}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
@@ -50,6 +63,8 @@ services:
       postgres:
         condition: service_healthy
       auth-service-migrate:
+        condition: service_completed_successfully
+      auth-service-seed:
         condition: service_completed_successfully
     healthcheck:
       test:

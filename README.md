@@ -157,6 +157,21 @@ Server will start on:
 http://localhost:4000
 ```
 
+### Docker
+
+Run the full auth service stack:
+
+```bash
+npm run docker:up
+```
+
+Docker runs database migrations and seeds the default users before starting the API.
+
+Default admin login:
+
+- Email: `admin@medsphere.local`
+- Password: `Admin1234!Pass`
+
 ---
 
 ## Testing
@@ -212,7 +227,7 @@ Implemented flows:
 - Forgot/reset password flow (`/api/auth/forgot-password`, `/api/auth/reset-password`)
 - Authenticated password change flow (`/api/auth/change-password`)
 - RBAC middleware for protected routes (auth, role, and permission checks)
-- Auth endpoint rate limiting and CORS allowlist support via env config
+- Auth endpoint rate limiting
 - Email delivery via Gmail/SMTP when `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASS` are configured
 - Email delivery via Resend when `RESEND_API_KEY` is configured, with console preview fallback in local development
 

@@ -6,6 +6,23 @@ describe('Auth routes', () => {
         jest.restoreAllMocks();
     });
 
+    it.each(['http://localhost:3001', 'http://localhost:5173', 'http://localhost:9000'])(
+        'allows auth requests from %s',
+        async (origin) => {
+            const { createApp } = await import('../../src/app');
+            const app = createApp();
+
+            const response = await request(app)
+                .options('/api/auth/login')
+                .set('Origin', origin)
+                .set('Access-Control-Request-Method', 'POST');
+
+            expect(response.status).toBe(204);
+            expect(response.headers['access-control-allow-origin']).toBe(origin);
+            expect(response.headers['access-control-allow-credentials']).toBe('true');
+        },
+    );
+
     it('returns 401 for change-password without authentication', async () => {
         const { createApp } = await import('../../src/app');
         const app = createApp();
