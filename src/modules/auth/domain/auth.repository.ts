@@ -11,6 +11,7 @@ export interface CreateAdminUserData {
     firstName: string;
     lastName: string;
     email: string;
+    username?: string | null;
     passwordHash: string;
     phone?: string;
     dateOfBirth?: Date;
@@ -28,6 +29,7 @@ export interface CreateOneTimeTokenData {
 export interface AuthUserView {
     id: string;
     email: string;
+    username?: string | null;
     firstName: string;
     lastName: string;
     passwordHash: string;
@@ -37,7 +39,7 @@ export interface AuthUserView {
 }
 
 export interface AuthRepository {
-    getUserAuthByEmail(email: string): Promise<AuthUserView | null>;
+    getUserAuthByIdentifier(identifier: string): Promise<AuthUserView | null>;
     getUserAuthById(id: string): Promise<AuthUserView | null>;
     createRefreshToken(data: CreateRefreshTokenData): Promise<void>;
     findValidRefreshToken(tokenHash: string): Promise<any | null>;
@@ -64,6 +66,7 @@ export interface AuthRepository {
     ): Promise<{
         id: string;
         email: string;
+        username?: string | null;
         firstName: string;
         lastName: string;
         isActive: boolean;

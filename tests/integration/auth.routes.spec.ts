@@ -23,6 +23,45 @@ describe('Auth routes', () => {
         },
     );
 
+    it('accepts a username value in the login email field', async () => {
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+
+        const loginSpy = jest
+            .spyOn(AuthService.prototype, 'login')
+            .mockResolvedValue({
+                accessToken: 'access-token',
+                refreshToken: 'refresh-token',
+                user: {
+                    id: 'u1',
+                    email: 'admin@medsphere.local',
+                    username: 'admin',
+                    firstName: 'System',
+                    lastName: 'Admin',
+                    roles: ['Super Admin'],
+                    permissions: ['users:read:all'],
+                },
+            });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const response = await request(app)
+            .post('/api/auth/login')
+            .send({
+                email: 'admin',
+                password: 'Admin1234!Pass',
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.user.username).toBe('admin');
+        expect(loginSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                email: 'admin',
+                password: 'Admin1234!Pass',
+            }),
+        );
+    });
+
     it('returns 401 for change-password without authentication', async () => {
         const { createApp } = await import('../../src/app');
         const app = createApp();

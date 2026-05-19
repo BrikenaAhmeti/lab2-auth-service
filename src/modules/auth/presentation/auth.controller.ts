@@ -10,10 +10,19 @@ import { JwtService } from '../../../shared/services/jwt.service';
 import { TokenHashService } from '../../../shared/services/token-hash.service';
 import { createEmailService } from '../../../shared/services/email.service';
 
+const usernameSchema = z
+    .string()
+    .trim()
+    .min(3)
+    .max(30)
+    .regex(/^[A-Za-z0-9._-]+$/)
+    .optional();
+
 const registerSchema = z.object({
     firstName: z.string().min(2).max(100),
     lastName: z.string().min(2).max(100),
     email: z.email(),
+    username: usernameSchema,
     password: z.string().min(12).max(100),
     phone: z.string().optional(),
     dateOfBirth: z.string().optional(),
@@ -22,7 +31,7 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-    email: z.email(),
+    email: z.string().trim().min(1).max(254),
     password: z.string().min(1),
 });
 
@@ -64,6 +73,7 @@ const createAdminUserSchema = z.object({
     firstName: z.string().min(2).max(100),
     lastName: z.string().min(2).max(100),
     email: z.email(),
+    username: usernameSchema,
     password: z.string().min(12).max(100),
     roles: z.array(z.string().min(1)).min(1),
     phone: z.string().optional(),
@@ -90,6 +100,7 @@ export class AuthController {
             firstName: body.firstName,
             lastName: body.lastName,
             email: body.email,
+            username: body.username,
             password: body.password,
             phone: body.phone,
             dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
@@ -256,6 +267,7 @@ export class AuthController {
             firstName: body.firstName,
             lastName: body.lastName,
             email: body.email,
+            username: body.username,
             password: body.password,
             roles: body.roles,
             phone: body.phone,

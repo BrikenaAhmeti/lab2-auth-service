@@ -9,12 +9,13 @@ function createMocks() {
         create: jest.fn(),
         findById: jest.fn(),
         findByEmail: jest.fn(),
+        findByUsername: jest.fn(),
         findDoctors: jest.fn(),
         updateMyProfile: jest.fn(),
     };
 
     const authRepository: jest.Mocked<AuthRepository> = {
-        getUserAuthByEmail: jest.fn(),
+        getUserAuthByIdentifier: jest.fn(),
         getUserAuthById: jest.fn(),
         createRefreshToken: jest.fn(),
         findValidRefreshToken: jest.fn(),
@@ -91,9 +92,10 @@ describe('AuthService', () => {
             m.emailService,
         );
 
-        m.authRepository.getUserAuthByEmail.mockResolvedValue({
+        m.authRepository.getUserAuthByIdentifier.mockResolvedValue({
             id: 'u1',
             email: 'admin@medsphere.local',
+            username: 'admin',
             firstName: 'Admin',
             lastName: 'User',
             passwordHash: 'hashed',
@@ -114,8 +116,48 @@ describe('AuthService', () => {
 
         expect(result.accessToken).toBe('access-token');
         expect(result.refreshToken).toBe('refresh-token');
+        expect(result.user.username).toBe('admin');
         expect(result.user.roles).toEqual(['Super Admin']);
         expect(m.authRepository.createRefreshToken).toHaveBeenCalled();
+    });
+
+    it('logs in with username through the existing email field', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        m.authRepository.getUserAuthByIdentifier.mockResolvedValue({
+            id: 'u1',
+            email: 'admin@medsphere.local',
+            username: 'admin',
+            firstName: 'Admin',
+            lastName: 'User',
+            passwordHash: 'hashed',
+            isActive: true,
+            roles: ['Super Admin'],
+            permissions: ['users:read:all'],
+        });
+        m.passwordService.compare.mockResolvedValue(true);
+        m.jwtService.signAccessToken.mockReturnValue('access-token');
+        m.jwtService.signRefreshToken.mockReturnValue('refresh-token');
+        m.tokenHashService.hash.mockReturnValue('refresh-hash');
+        m.authRepository.createRefreshToken.mockResolvedValue();
+
+        const result = await service.login({
+            email: ' Admin ',
+            password: 'Admin1234!Pass',
+        });
+
+        expect(m.authRepository.getUserAuthByIdentifier).toHaveBeenCalledWith('admin');
+        expect(result.user.email).toBe('admin@medsphere.local');
+        expect(result.user.username).toBe('admin');
     });
 
     it('rejects login for inactive user', async () => {
@@ -130,9 +172,10 @@ describe('AuthService', () => {
             m.emailService,
         );
 
-        m.authRepository.getUserAuthByEmail.mockResolvedValue({
+        m.authRepository.getUserAuthByIdentifier.mockResolvedValue({
             id: 'u1',
             email: 'patient@demo.local',
+            username: 'patient',
             firstName: 'Patient',
             lastName: 'User',
             passwordHash: 'hashed',
@@ -224,6 +267,7 @@ describe('AuthService', () => {
         );
 
         m.userRepository.findByEmail.mockResolvedValue(null);
+        m.userRepository.findByUsername.mockResolvedValue(null);
         m.authRepository.findRolesByNames.mockResolvedValue([{ id: 'role-patient', name: 'Patient' }]);
         m.authRepository.assignRolesToUser.mockResolvedValue();
         m.passwordService.hash.mockResolvedValue('hashed-password');
@@ -232,6 +276,7 @@ describe('AuthService', () => {
             firstName: 'John',
             lastName: 'Doe',
             email: 'john@demo.local',
+            username: 'john',
             isActive: false,
         });
         m.tokenHashService.hash.mockReturnValue('verify-hash');
@@ -241,10 +286,13 @@ describe('AuthService', () => {
             firstName: 'John',
             lastName: 'Doe',
             email: 'john@demo.local',
+            username: 'John',
             password: 'StrongPass123!',
         });
 
         expect(result.user.email).toBe('john@demo.local');
+        expect(result.user.username).toBe('john');
+        expect(m.userRepository.findByUsername).toHaveBeenCalledWith('john');
         expect(m.authRepository.createEmailVerificationToken).toHaveBeenCalled();
         expect(m.authRepository.assignRolesToUser).toHaveBeenCalledWith('u100', ['role-patient']);
         expect(m.emailService.send).toHaveBeenCalled();
@@ -400,6 +448,7 @@ describe('AuthService', () => {
         );
 
         m.userRepository.findByEmail.mockResolvedValue(null);
+        m.userRepository.findByUsername.mockResolvedValue(null);
         m.authRepository.findRolesByNames.mockResolvedValue([
             { id: 'r1', name: 'Doctor' },
         ]);
@@ -407,6 +456,7 @@ describe('AuthService', () => {
         m.authRepository.createUserWithRoles.mockResolvedValue({
             id: 'u200',
             email: 'doctor2@medsphere.local',
+            username: 'doctor2',
             firstName: 'Ana',
             lastName: 'Doctor',
             isActive: true,
@@ -418,11 +468,14 @@ describe('AuthService', () => {
             firstName: 'Ana',
             lastName: 'Doctor',
             email: 'doctor2@medsphere.local',
+            username: 'Doctor2',
             password: 'DoctorPass123!',
             roles: ['Doctor'],
         });
 
         expect(result.user.roles).toEqual(['Doctor']);
+        expect(result.user.username).toBe('doctor2');
+        expect(m.userRepository.findByUsername).toHaveBeenCalledWith('doctor2');
         expect(m.authRepository.createUserWithRoles).toHaveBeenCalled();
     });
 });

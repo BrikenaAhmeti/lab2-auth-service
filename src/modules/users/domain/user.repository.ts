@@ -2,6 +2,7 @@ export interface CreateUserData {
     firstName: string;
     lastName: string;
     email: string;
+    username?: string | null;
     passwordHash: string;
     phone?: string;
     dateOfBirth?: Date;
@@ -27,6 +28,7 @@ export interface UserRepository {
     create(data: CreateUserData): Promise<any>;
     findById(id: string): Promise<any | null>;
     findByEmail(email: string): Promise<any | null>;
+    findByUsername(username: string): Promise<any | null>;
     findDoctors(): Promise<any[]>;
     updateMyProfile(userId: string, data: UpdateMyProfileData): Promise<any>;
 }

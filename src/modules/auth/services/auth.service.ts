@@ -32,6 +32,24 @@ export class AuthService {
         }
     }
 
+    private normalizeUsername(username?: string | null) {
+        if (!username) {
+            return undefined;
+        }
+
+        const normalized = username.trim().toLowerCase();
+        const usernameFormat = /^[a-z0-9._-]{3,30}$/;
+
+        if (!usernameFormat.test(normalized)) {
+            throw new AppError(
+                'Username must be 3-30 characters and contain only letters, numbers, dots, underscores, or hyphens',
+                400,
+            );
+        }
+
+        return normalized;
+    }
+
     private createOneTimeToken(hoursToExpire: number) {
         const rawToken = crypto.randomBytes(32).toString('hex');
         const tokenHash = this.tokenHashService.hash(rawToken);
@@ -84,14 +102,23 @@ export class AuthService {
         dateOfBirth?: Date;
         gender?: string;
         personalNumber?: string;
+        username?: string;
         ipAddress?: string;
         userAgent?: string;
     }) {
         const email = input.email.trim().toLowerCase();
+        const username = this.normalizeUsername(input.username);
 
         const existing = await this.userRepository.findByEmail(email);
         if (existing) {
             throw new AppError('Email already in use', 409);
+        }
+
+        if (username) {
+            const existingUsername = await this.userRepository.findByUsername(username);
+            if (existingUsername) {
+                throw new AppError('Username already in use', 409);
+            }
         }
 
         this.assertPasswordComplexity(input.password);
@@ -101,6 +128,7 @@ export class AuthService {
             firstName: input.firstName.trim(),
             lastName: input.lastName.trim(),
             email,
+            username,
             passwordHash,
             phone: input.phone?.trim(),
             dateOfBirth: input.dateOfBirth,
@@ -133,6 +161,7 @@ export class AuthService {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
+                username: user.username,
             },
             ipAddress: input.ipAddress,
             userAgent: input.userAgent,
@@ -145,6 +174,7 @@ export class AuthService {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
+                username: user.username,
                 isActive: user.isActive,
             },
         };
@@ -157,15 +187,14 @@ export class AuthService {
         ipAddress?: string;
         userAgent?: string;
     }) {
-        const user = await this.authRepository.getUserAuthByEmail(
-            input.email.trim().toLowerCase(),
-        );
+        const identifier = input.email.trim().toLowerCase();
+        const user = await this.authRepository.getUserAuthByIdentifier(identifier);
 
         if (!user) {
             await this.auditLogService.log({
                 action: 'login.failed',
                 entity: 'auth',
-                newValue: { email: input.email },
+                newValue: { identifier: input.email },
                 ipAddress: input.ipAddress,
                 userAgent: input.userAgent,
             });
@@ -236,6 +265,7 @@ export class AuthService {
             user: {
                 id: user.id,
                 email: user.email,
+                username: user.username,
                 firstName: user.firstName,
                 lastName: user.lastName,
                 roles: user.roles,
@@ -313,6 +343,7 @@ export class AuthService {
             user: {
                 id: user.id,
                 email: user.email,
+                username: user.username,
                 firstName: user.firstName,
                 lastName: user.lastName,
                 roles: user.roles,
@@ -358,6 +389,7 @@ export class AuthService {
         return {
             id: user.id,
             email: user.email,
+            username: user.username,
             firstName: user.firstName,
             lastName: user.lastName,
             roles: user.roles,
@@ -609,13 +641,22 @@ export class AuthService {
         dateOfBirth?: Date;
         gender?: string;
         personalNumber?: string;
+        username?: string;
         ipAddress?: string;
         userAgent?: string;
     }) {
         const email = input.email.trim().toLowerCase();
+        const username = this.normalizeUsername(input.username);
         const existing = await this.userRepository.findByEmail(email);
         if (existing) {
             throw new AppError('Email already in use', 409);
+        }
+
+        if (username) {
+            const existingUsername = await this.userRepository.findByUsername(username);
+            if (existingUsername) {
+                throw new AppError('Username already in use', 409);
+            }
         }
 
         this.assertPasswordComplexity(input.password);
@@ -639,6 +680,7 @@ export class AuthService {
                 firstName: input.firstName.trim(),
                 lastName: input.lastName.trim(),
                 email,
+                username,
                 passwordHash,
                 phone: input.phone?.trim(),
                 dateOfBirth: input.dateOfBirth,
@@ -656,6 +698,7 @@ export class AuthService {
             entityId: user.id,
             newValue: {
                 email: user.email,
+                username: user.username,
                 roles: user.roles,
             },
             ipAddress: input.ipAddress,

@@ -24,6 +24,12 @@ export class UserPrismaRepository implements UserRepository {
         });
     }
 
+    async findByUsername(username: string): Promise<any | null> {
+        return prisma.user.findUnique({
+            where: { username },
+        });
+    }
+
     async findDoctors(): Promise<any[]> {
         return prisma.user.findMany({
             where: {
@@ -41,6 +47,7 @@ export class UserPrismaRepository implements UserRepository {
                 firstName: true,
                 lastName: true,
                 email: true,
+                username: true,
                 phone: true,
                 avatarFileId: true,
             },

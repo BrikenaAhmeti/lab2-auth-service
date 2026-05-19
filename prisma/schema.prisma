@@ -12,6 +12,7 @@ model User {
   firstName       String
   lastName        String
   email           String         @unique
+  username        String?        @unique
   passwordHash    String
   phone           String?
   dateOfBirth     DateTime?
@@ -31,6 +32,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
 
   @@index([email])
+  @@index([username])
   @@index([personalNumber])
 }
 

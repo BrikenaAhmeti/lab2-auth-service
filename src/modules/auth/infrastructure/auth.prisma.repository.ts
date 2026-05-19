@@ -24,6 +24,7 @@ function mapAuthUser(user: any): AuthUserView {
     return {
         id: user.id,
         email: user.email,
+        username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
         passwordHash: user.passwordHash,
@@ -34,9 +35,14 @@ function mapAuthUser(user: any): AuthUserView {
 }
 
 export class AuthPrismaRepository implements AuthRepository {
-    async getUserAuthByEmail(email: string): Promise<AuthUserView | null> {
-        const user = await prisma.user.findUnique({
-            where: { email },
+    async getUserAuthByIdentifier(identifier: string): Promise<AuthUserView | null> {
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { email: identifier },
+                    { username: identifier },
+                ],
+            },
             include: {
                 userRoles: {
                     include: {
@@ -319,6 +325,7 @@ export class AuthPrismaRepository implements AuthRepository {
                     firstName: data.firstName,
                     lastName: data.lastName,
                     email: data.email,
+                    username: data.username,
                     passwordHash: data.passwordHash,
                     phone: data.phone,
                     dateOfBirth: data.dateOfBirth,
@@ -354,6 +361,7 @@ export class AuthPrismaRepository implements AuthRepository {
             return {
                 id: user.id,
                 email: user.email,
+                username: user.username,
                 firstName: user.firstName,
                 lastName: user.lastName,
                 isActive: user.isActive,

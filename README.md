@@ -170,6 +170,7 @@ Docker runs database migrations and seeds the default users before starting the 
 Default admin login:
 
 - Email: `admin@medsphere.local`
+- Username: `admin`
 - Password: `Admin1234!Pass`
 
 ---
@@ -223,6 +224,7 @@ Implemented flows:
 - Admin-managed user/staff account creation with role assignment
 - Email verification token flow (`/api/auth/verify-email`, `/api/auth/resend-verification`)
 - Login with JWT access token (15 minutes) + refresh token (7 days)
+- Login accepts either email address or username in the existing `email` request field
 - Refresh token hashing, rotation, revocation, and active session listing/revocation
 - Forgot/reset password flow (`/api/auth/forgot-password`, `/api/auth/reset-password`)
 - Authenticated password change flow (`/api/auth/change-password`)
@@ -240,6 +242,7 @@ Auth API artifacts:
 Default seeded admin for frontend testing:
 
 - Email: `admin@medsphere.local`
+- Username: `admin`
 - Password: `Admin1234!Pass`
 
 ---

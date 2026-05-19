@@ -5,6 +5,7 @@ const DEFAULT_ADMIN = {
     firstName: 'System',
     lastName: 'Admin',
     email: 'admin@medsphere.local',
+    username: 'admin',
     password: 'Admin1234!Pass',
 };
 
@@ -12,6 +13,7 @@ const DEFAULT_DOCTOR = {
     firstName: 'Emily',
     lastName: 'Johnson',
     email: 'doctor@medsphere.local',
+    username: 'doctor',
     password: 'Doctor1234!Pass',
 };
 
@@ -149,6 +151,7 @@ async function ensureDefaultAdminUser() {
         update: {
             firstName: DEFAULT_ADMIN.firstName,
             lastName: DEFAULT_ADMIN.lastName,
+            username: DEFAULT_ADMIN.username,
             passwordHash,
             isActive: true,
             emailVerifiedAt: now,
@@ -157,6 +160,7 @@ async function ensureDefaultAdminUser() {
             firstName: DEFAULT_ADMIN.firstName,
             lastName: DEFAULT_ADMIN.lastName,
             email: DEFAULT_ADMIN.email,
+            username: DEFAULT_ADMIN.username,
             passwordHash,
             isActive: true,
             emailVerifiedAt: now,
@@ -199,6 +203,7 @@ async function ensureDefaultDoctorUser() {
         update: {
             firstName: DEFAULT_DOCTOR.firstName,
             lastName: DEFAULT_DOCTOR.lastName,
+            username: DEFAULT_DOCTOR.username,
             passwordHash,
             isActive: true,
             emailVerifiedAt: now,
@@ -207,6 +212,7 @@ async function ensureDefaultDoctorUser() {
             firstName: DEFAULT_DOCTOR.firstName,
             lastName: DEFAULT_DOCTOR.lastName,
             email: DEFAULT_DOCTOR.email,
+            username: DEFAULT_DOCTOR.username,
             passwordHash,
             isActive: true,
             emailVerifiedAt: now,
@@ -249,8 +255,10 @@ async function main() {
 
     console.log('Seed complete.');
     console.log(`Admin email: ${user.email}`);
+    console.log(`Admin username: ${user.username}`);
     console.log(`Admin password: ${DEFAULT_ADMIN.password}`);
     console.log(`Doctor email: ${doctor.email}`);
+    console.log(`Doctor username: ${doctor.username}`);
     console.log(`Doctor password: ${DEFAULT_DOCTOR.password}`);
     console.log('Please change this password after first login.');
 }
