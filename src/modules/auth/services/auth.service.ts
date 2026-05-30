@@ -91,8 +91,24 @@ export class AuthService {
         return { rawCode, expiresAt };
     }
 
-    private hashEmailVerificationCode(userId: string, code: string) {
+    private hashEmailVerificationToken(token: string) {
+        return this.tokenHashService.hash(token);
+    }
+
+    private hashLegacyEmailVerificationCode(userId: string, code: string) {
         return this.tokenHashService.hash(`${userId}:${code}`);
+    }
+
+    private getEmailProviderName() {
+        return this.emailService.getProviderName?.() ?? 'unknown';
+    }
+
+    private isEmailDeliveryConfigured() {
+        return this.emailService.isDeliveryConfigured?.() ?? true;
+    }
+
+    private isProduction() {
+        return env.nodeEnv === 'production';
     }
 
     private buildTokenUrl(baseUrl: string, token: string) {
@@ -102,6 +118,9 @@ export class AuthService {
     }
 
     private async sendVerificationEmail(email: string, code: string) {
+        console.info(
+            `[auth] verification_email send_start recipient=${email} provider=${this.getEmailProviderName()}`,
+        );
         await this.emailService.send({
             to: email,
             subject: 'Verify your MedSphere account',
@@ -116,6 +135,44 @@ export class AuthService {
                 '<p>This code expires in 15 minutes.</p>',
             ].join(''),
         });
+        console.info(
+            `[auth] verification_email send_success recipient=${email} provider=${this.getEmailProviderName()}`,
+        );
+    }
+
+    private async sendVerificationEmailForFlow(email: string, code: string) {
+        try {
+            await this.sendVerificationEmail(email, code);
+            return { delivered: this.isEmailDeliveryConfigured(), error: undefined };
+        } catch (error) {
+            console.error(
+                `[auth] verification_email send_failure recipient=${email} provider=${this.getEmailProviderName()}`,
+                error,
+            );
+
+            if (this.isProduction()) {
+                throw error;
+            }
+
+            return { delivered: false, error };
+        }
+    }
+
+    private appendDevVerificationCode<T extends Record<string, any>>(
+        response: T,
+        delivered: boolean,
+        code: string,
+    ): T & { devVerificationCode?: string; emailDeliveryWarning?: string } {
+        if (this.isProduction() || delivered) {
+            return response;
+        }
+
+        return {
+            ...response,
+            devVerificationCode: code,
+            emailDeliveryWarning:
+                'Email delivery is not configured or failed. This code is returned only outside production.',
+        };
     }
 
     private async sendPasswordResetEmail(email: string, token: string) {
@@ -187,12 +244,22 @@ export class AuthService {
         await this.authRepository.assignRolesToUser(user.id, [patientRoles[0].id]);
 
         const verification = this.createEmailVerificationCode(15);
+        console.info(
+            `[auth] verification_token generated userId=${user.id} email=${user.email} expiresAt=${verification.expiresAt.toISOString()} devCode=${this.isProduction() ? '[hidden]' : verification.rawCode}`,
+        );
+        const verificationTokenHash = this.hashEmailVerificationToken(verification.rawCode);
         await this.authRepository.createEmailVerificationToken({
             userId: user.id,
-            tokenHash: this.hashEmailVerificationCode(user.id, verification.rawCode),
+            tokenHash: verificationTokenHash,
             expiresAt: verification.expiresAt,
         });
-        await this.sendVerificationEmail(user.email, verification.rawCode);
+        console.info(
+            `[auth] verification_token persisted userId=${user.id} email=${user.email} tokenHashPrefix=${verificationTokenHash.slice(0, 12)}`,
+        );
+        const emailResult = await this.sendVerificationEmailForFlow(
+            user.email,
+            verification.rawCode,
+        );
 
         await this.auditLogService.log({
             userId: user.id,
@@ -209,7 +276,7 @@ export class AuthService {
             userAgent: input.userAgent,
         });
 
-        return {
+        return this.appendDevVerificationCode({
             message: 'Registration successful. Check your email for the verification code to activate the account.',
             user: {
                 id: user.id,
@@ -219,7 +286,7 @@ export class AuthService {
                 username: user.username,
                 isActive: user.isActive,
             },
-        };
+        }, emailResult.delivered, verification.rawCode);
     }
 
     async login(input: {
@@ -518,11 +585,19 @@ export class AuthService {
                 return { success: true, message: 'Email is already verified.' };
             }
 
-            verificationToken = await this.authRepository.findValidEmailVerificationToken(
-                this.hashEmailVerificationCode(user.id, code),
-            );
+            verificationToken =
+                await this.authRepository.findValidEmailVerificationToken(
+                    this.hashEmailVerificationToken(code),
+                );
+
+            if (!verificationToken) {
+                verificationToken =
+                    await this.authRepository.findValidEmailVerificationToken(
+                        this.hashLegacyEmailVerificationCode(user.id, code),
+                    );
+            }
         } else if (input.token) {
-            const tokenHash = this.tokenHashService.hash(input.token);
+            const tokenHash = this.hashEmailVerificationToken(input.token.trim());
             verificationToken =
                 await this.authRepository.findValidEmailVerificationToken(tokenHash);
         }
@@ -564,12 +639,22 @@ export class AuthService {
         await this.authRepository.invalidateEmailVerificationTokens(user.id);
 
         const verification = this.createEmailVerificationCode(15);
+        console.info(
+            `[auth] verification_token generated userId=${user.id} email=${user.email} expiresAt=${verification.expiresAt.toISOString()} devCode=${this.isProduction() ? '[hidden]' : verification.rawCode}`,
+        );
+        const verificationTokenHash = this.hashEmailVerificationToken(verification.rawCode);
         await this.authRepository.createEmailVerificationToken({
             userId: user.id,
-            tokenHash: this.hashEmailVerificationCode(user.id, verification.rawCode),
+            tokenHash: verificationTokenHash,
             expiresAt: verification.expiresAt,
         });
-        await this.sendVerificationEmail(user.email, verification.rawCode);
+        console.info(
+            `[auth] verification_token persisted userId=${user.id} email=${user.email} tokenHashPrefix=${verificationTokenHash.slice(0, 12)}`,
+        );
+        const emailResult = await this.sendVerificationEmailForFlow(
+            user.email,
+            verification.rawCode,
+        );
 
         await this.auditLogService.log({
             userId: user.id,
@@ -580,10 +665,10 @@ export class AuthService {
             userAgent: input.userAgent,
         });
 
-        return {
+        return this.appendDevVerificationCode({
             success: true,
             message: 'Verification code has been re-issued.',
-        };
+        }, emailResult.delivered, verification.rawCode);
     }
 
     async requestPasswordReset(input: {

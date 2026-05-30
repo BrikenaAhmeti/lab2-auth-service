@@ -300,7 +300,7 @@ describe('AuthService', () => {
         expect(m.userRepository.create).toHaveBeenCalledWith(
             expect.objectContaining({ personalNumber: '1234567890' }),
         );
-        expect(m.tokenHashService.hash).toHaveBeenCalledWith(expect.stringMatching(/^u100:\d{6}$/));
+        expect(m.tokenHashService.hash).toHaveBeenCalledWith(expect.stringMatching(/^\d{6}$/));
         expect(m.authRepository.createEmailVerificationToken).toHaveBeenCalledWith(
             expect.objectContaining({ tokenHash: 'verify-hash' }),
         );
@@ -393,8 +393,50 @@ describe('AuthService', () => {
         });
 
         expect(result.success).toBe(true);
-        expect(m.tokenHashService.hash).toHaveBeenCalledWith('u1:123456');
+        expect(m.tokenHashService.hash).toHaveBeenCalledWith('123456');
         expect(m.authRepository.markUserEmailVerified).toHaveBeenCalledWith('u1');
+    });
+
+    it('returns a dev-only verification code when email delivery fails outside production', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        m.userRepository.findByEmail.mockResolvedValue(null);
+        m.userRepository.findByUsername.mockResolvedValue(null);
+        m.userRepository.findByPersonalNumber.mockResolvedValue(null);
+        m.authRepository.findRolesByNames.mockResolvedValue([{ id: 'role-patient', name: 'Patient' }]);
+        m.authRepository.assignRolesToUser.mockResolvedValue();
+        m.passwordService.hash.mockResolvedValue('hashed-password');
+        m.userRepository.create.mockResolvedValue({
+            id: 'u100',
+            firstName: 'John',
+            lastName: 'Doe',
+            email: 'john@demo.local',
+            username: null,
+            isActive: false,
+        });
+        m.tokenHashService.hash.mockReturnValue('verify-hash');
+        m.authRepository.createEmailVerificationToken.mockResolvedValue();
+        m.emailService.send.mockRejectedValue(new Error('SMTP unavailable'));
+
+        const result = await service.registerPatient({
+            firstName: 'John',
+            lastName: 'Doe',
+            email: 'john@demo.local',
+            password: 'StrongPass123!',
+            personalNumber: '1234567890',
+        });
+
+        expect(result.devVerificationCode).toMatch(/^\d{6}$/);
+        expect(result.emailDeliveryWarning).toContain('outside production');
     });
 
     it('requests and completes password reset', async () => {
