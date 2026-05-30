@@ -237,7 +237,11 @@ Auth API artifacts:
 
 - OpenAPI: `docs/openapi/auth.openapi.json`
 - Postman collection: `docs/postman/MedSphere-Auth.postman_collection.json`
-- Swagger UI: `/docs`
+- Swagger UI: `/docs` and `/api/docs`
+
+AI/OpenAI note:
+
+- This auth service does not require OpenAI credentials or an OpenAI SDK. Per the MedSphere plan, OpenAI-backed transcription, summarization, lab interpretation, and reservation-agent features belong in a separate AI service.
 
 Default seeded admin for frontend testing:
 

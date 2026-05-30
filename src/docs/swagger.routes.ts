@@ -37,8 +37,14 @@ const swaggerHtml = `<!DOCTYPE html>
     <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
     <script>
       window.onload = () => {
+        const docsBasePath = window.location.pathname
+          .replace(/\\/$/, '')
+          .endsWith('/api/docs')
+          ? '/api/docs'
+          : '/docs';
+
         window.SwaggerUIBundle({
-          url: '/docs/openapi.json',
+          url: docsBasePath + '/openapi.json',
           dom_id: '#swagger-ui',
           deepLinking: true,
           presets: [window.SwaggerUIBundle.presets.apis],

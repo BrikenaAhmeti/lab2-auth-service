@@ -8,6 +8,11 @@ export class UserService {
         private readonly auditLogService: AuditLogService,
     ) { }
 
+    private toPublicProfile(user: any) {
+        const { passwordHash, personalNumber, ...publicProfile } = user;
+        return publicProfile;
+    }
+
     async getCurrentUser(userId: string) {
         const user = await this.userRepository.findById(userId);
 
@@ -15,7 +20,7 @@ export class UserService {
             throw new AppError('User not found', 404);
         }
 
-        return user;
+        return this.toPublicProfile(user);
     }
 
     async getDoctors() {
@@ -76,6 +81,6 @@ export class UserService {
             userAgent: data.userAgent,
         });
 
-        return updated;
+        return this.toPublicProfile(updated);
     }
 }

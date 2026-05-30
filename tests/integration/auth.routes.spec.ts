@@ -62,6 +62,27 @@ describe('Auth routes', () => {
         );
     });
 
+    it('returns 400 for validation errors', async () => {
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const response = await request(app)
+            .post('/api/auth/login')
+            .send({
+                email: '',
+                password: '',
+            });
+
+        expect(response.status).toBe(400);
+        expect(response.body.message).toBe('Validation error');
+        expect(response.body.issues).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ path: 'email' }),
+                expect.objectContaining({ path: 'password' }),
+            ]),
+        );
+    });
+
     it('returns 401 for change-password without authentication', async () => {
         const { createApp } = await import('../../src/app');
         const app = createApp();
@@ -176,6 +197,10 @@ describe('Auth routes', () => {
         expect(response.status).toBe(200);
         expect(response.body.openapi).toBe('3.0.3');
         expect(response.body.paths['/api/auth/login']).toBeDefined();
+        expect(response.body.paths['/health']).toBeDefined();
+        expect(response.body.paths['/departments/{id}']).toBeDefined();
+        expect(response.body.components.securitySchemes.bearerAuth).toBeDefined();
+        expect(response.body.components.schemas.LoginRequest).toBeDefined();
     });
 
     it('serves the swagger ui page', async () => {
@@ -186,6 +211,19 @@ describe('Auth routes', () => {
 
         expect(response.status).toBe(200);
         expect(response.text).toContain('SwaggerUIBundle');
-        expect(response.text).toContain('/docs/openapi.json');
+        expect(response.text).toContain('docsBasePath + \'/openapi.json\'');
+    });
+
+    it('serves swagger under the API docs alias', async () => {
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const uiResponse = await request(app).get('/api/docs');
+        const specResponse = await request(app).get('/api/docs/openapi.json');
+
+        expect(uiResponse.status).toBe(200);
+        expect(uiResponse.text).toContain('SwaggerUIBundle');
+        expect(specResponse.status).toBe(200);
+        expect(specResponse.body.paths['/api/auth/admin/users']).toBeDefined();
     });
 });

@@ -27,6 +27,7 @@ export function createApp() {
     });
 
     app.use('/docs', swaggerRoutes);
+    app.use('/api/docs', swaggerRoutes);
     app.use('/departments', departmentRoutes);
     app.use('/api/auth', authRoutes);
     app.use('/api/users', userRoutes);

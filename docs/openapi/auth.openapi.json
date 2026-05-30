@@ -3,11 +3,38 @@
   "info": {
     "title": "MedSphere Auth Service API",
     "version": "1.0.0",
-    "description": "Authentication and identity endpoints implemented in the auth-service backend."
+    "description": "OpenAPI documentation for the MedSphere auth-service backend. This service owns authentication, identity, user profile endpoints, session management, RBAC-protected admin identity operations, and the currently hosted department endpoints."
   },
   "servers": [
     {
-      "url": "http://localhost:3005"
+      "url": "http://localhost:3005",
+      "description": "Local development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Service health checks"
+    },
+    {
+      "name": "Authentication",
+      "description": "Registration, login, token, email verification, and password flows"
+    },
+    {
+      "name": "Sessions",
+      "description": "Refresh-token backed active session management"
+    },
+    {
+      "name": "Admin",
+      "description": "Admin-only identity operations"
+    },
+    {
+      "name": "Users",
+      "description": "Current user profile and doctor directory endpoints"
+    },
+    {
+      "name": "Departments",
+      "description": "Department endpoints currently exposed by this service"
     }
   ],
   "components": {
@@ -15,140 +42,1716 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT"
+        "bearerFormat": "JWT",
+        "description": "JWT access token returned by POST /api/auth/login or POST /api/auth/refresh."
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Validation or business-rule error.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              ]
+            },
+            "examples": {
+              "validation": {
+                "summary": "Zod validation error",
+                "value": {
+                  "message": "Validation error",
+                  "issues": [
+                    {
+                      "path": "password",
+                      "message": "Too small: expected string to have >=12 characters"
+                    }
+                  ]
+                }
+              },
+              "businessRule": {
+                "summary": "Business-rule error",
+                "value": {
+                  "message": "Current password is incorrect"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, invalid, or expired authentication token.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "missing": {
+                "value": {
+                  "message": "Unauthorized"
+                }
+              },
+              "invalid": {
+                "value": {
+                  "message": "Invalid or expired token"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Authenticated user does not have the required role or permission.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "message": "Forbidden"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Requested resource was not found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "message": "User not found"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Requested change conflicts with an existing resource.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "email": {
+                "value": {
+                  "message": "Email already in use"
+                }
+              },
+              "department": {
+                "value": {
+                  "message": "Department already exists"
+                }
+              }
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Auth rate limit exceeded.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "message": "Too many auth requests. Try again in a minute."
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Unauthorized"
+          }
+        }
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "required": [
+          "message",
+          "issues"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Validation error"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssue"
+            }
+          }
+        }
+      },
+      "ValidationIssue": {
+        "type": "object",
+        "required": [
+          "path",
+          "message"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "example": "email"
+          },
+          "message": {
+            "type": "string",
+            "example": "Invalid email address"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Email verified successfully."
+          }
+        }
+      },
+      "UserCore": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "firstName",
+          "lastName"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "7d56e9fb-e26c-4b87-9d11-8896470b08c9"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "doctor@medsphere.local"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true,
+            "example": "doctor"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Emily"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Johnson"
+          }
+        }
+      },
+      "AuthUser": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UserCore"
+          },
+          {
+            "type": "object",
+            "required": [
+              "roles",
+              "permissions"
+            ],
+            "properties": {
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "Doctor"
+                ]
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "users:read:own",
+                  "users:update:own"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ProfileUser": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UserCore"
+          },
+          {
+            "type": "object",
+            "required": [
+              "isActive",
+              "createdAt",
+              "updatedAt"
+            ],
+            "properties": {
+              "phone": {
+                "type": "string",
+                "nullable": true,
+                "example": "+38344123456"
+              },
+              "dateOfBirth": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true,
+                "example": "1990-05-12T00:00:00.000Z"
+              },
+              "gender": {
+                "type": "string",
+                "nullable": true,
+                "example": "female"
+              },
+              "avatarFileId": {
+                "type": "string",
+                "nullable": true,
+                "example": "file_01hv7k7c4m9w8g"
+              },
+              "isActive": {
+                "type": "boolean",
+                "example": true
+              },
+              "emailVerifiedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true,
+                "example": "2026-03-20T10:15:00.000Z"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-03-20T10:00:00.000Z"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-03-20T10:15:00.000Z"
+              },
+              "createdBy": {
+                "type": "string",
+                "format": "uuid",
+                "nullable": true,
+                "example": "0eb832a7-9c8f-45d0-9724-4240cc9ffb4c"
+              },
+              "updatedBy": {
+                "type": "string",
+                "format": "uuid",
+                "nullable": true,
+                "example": "0eb832a7-9c8f-45d0-9724-4240cc9ffb4c"
+              }
+            }
+          }
+        ]
+      },
+      "Doctor": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UserCore"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "phone": {
+                "type": "string",
+                "nullable": true,
+                "example": "+38344123456"
+              },
+              "avatarFileId": {
+                "type": "string",
+                "nullable": true,
+                "example": "file_01hv7k7c4m9w8g"
+              }
+            }
+          }
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "required": [
+          "id",
+          "expiresAt",
+          "lastUsedAt",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "d24f9ffc-b7aa-4c50-8ac3-a9a7a6c8aa09"
+          },
+          "deviceInfo": {
+            "type": "string",
+            "nullable": true,
+            "example": "Mozilla/5.0"
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true,
+            "example": "::1"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-27T10:00:00.000Z"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-20T10:30:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-20T10:00:00.000Z"
+          }
+        }
+      },
+      "Department": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "bf05b0c0-cd85-49d4-b189-934f720b8b0f"
+          },
+          "name": {
+            "type": "string",
+            "example": "Cardiology"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "example": "Heart and vascular care department"
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-20T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-20T10:00:00.000Z"
+          }
+        }
+      },
+      "AuthTokenResponse": {
+        "type": "object",
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "user"
+        ],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "refreshToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          }
+        }
+      },
+      "RegisterPatientRequest": {
+        "type": "object",
+        "required": [
+          "firstName",
+          "lastName",
+          "email",
+          "password"
+        ],
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "example": "Arta"
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "example": "Patient"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "arta.patient@example.com"
+          },
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 30,
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "example": "arta.patient"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 12,
+            "maxLength": 100,
+            "description": "Must include uppercase, lowercase, number, and special character.",
+            "example": "PatientPass123!"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+38344123456"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date",
+            "example": "1990-05-12"
+          },
+          "gender": {
+            "type": "string",
+            "example": "female"
+          },
+          "personalNumber": {
+            "type": "string",
+            "example": "1234567890"
+          }
+        },
+        "example": {
+          "firstName": "Arta",
+          "lastName": "Patient",
+          "email": "arta.patient@example.com",
+          "username": "arta.patient",
+          "password": "PatientPass123!",
+          "phone": "+38344123456",
+          "dateOfBirth": "1990-05-12",
+          "gender": "female",
+          "personalNumber": "1234567890"
+        }
+      },
+      "RegisterPatientResponse": {
+        "type": "object",
+        "required": [
+          "message",
+          "user"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Registration successful. Verify your email to activate the account."
+          },
+          "user": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserCore"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "isActive"
+                ],
+                "properties": {
+                  "isActive": {
+                    "type": "boolean",
+                    "example": false
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address or username. The field is named email for backward compatibility.",
+            "example": "admin"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "example": "Admin1234!Pass"
+          }
+        },
+        "example": {
+          "email": "admin",
+          "password": "Admin1234!Pass"
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": [
+          "refreshToken"
+        ],
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        }
+      },
+      "TokenRequest": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "raw-one-time-token"
+          }
+        }
+      },
+      "EmailRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "arta.patient@example.com"
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": [
+          "token",
+          "newPassword"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "raw-reset-token"
+          },
+          "newPassword": {
+            "type": "string",
+            "format": "password",
+            "minLength": 12,
+            "maxLength": 100,
+            "description": "Must include uppercase, lowercase, number, and special character.",
+            "example": "NewPassword123!"
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "format": "password",
+            "example": "CurrentPass123!"
+          },
+          "newPassword": {
+            "type": "string",
+            "format": "password",
+            "minLength": 12,
+            "maxLength": 100,
+            "description": "Must include uppercase, lowercase, number, and special character.",
+            "example": "ChangedPass123!"
+          }
+        }
+      },
+      "CreateAdminUserRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RegisterPatientRequest"
+          },
+          {
+            "type": "object",
+            "required": [
+              "roles"
+            ],
+            "properties": {
+              "roles": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "Doctor"
+                ]
+              }
+            }
+          }
+        ],
+        "example": {
+          "firstName": "Ana",
+          "lastName": "Doctor",
+          "email": "ana.doctor@medsphere.local",
+          "username": "ana.doctor",
+          "password": "DoctorPass123!",
+          "roles": [
+            "Doctor"
+          ],
+          "phone": "+38344111222"
+        }
+      },
+      "CreateAdminUserResponse": {
+        "type": "object",
+        "required": [
+          "message",
+          "user"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "User account created successfully."
+          },
+          "user": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserCore"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "isActive",
+                  "roles"
+                ],
+                "properties": {
+                  "isActive": {
+                    "type": "boolean",
+                    "example": true
+                  },
+                  "roles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": [
+                      "Doctor"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "example": "Arta"
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "example": "Patient"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "+38344123456"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "example": "1990-05-12"
+          },
+          "gender": {
+            "type": "string",
+            "nullable": true,
+            "example": "female"
+          },
+          "avatarFileId": {
+            "type": "string",
+            "nullable": true,
+            "example": "file_01hv7k7c4m9w8g"
+          }
+        },
+        "example": {
+          "firstName": "Arta",
+          "lastName": "Patient",
+          "phone": "+38344123456",
+          "dateOfBirth": "1990-05-12",
+          "gender": "female",
+          "avatarFileId": "file_01hv7k7c4m9w8g"
+        }
+      },
+      "CreateDepartmentRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "example": "Cardiology"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Heart and vascular care department"
+          }
+        },
+        "example": {
+          "name": "Cardiology",
+          "description": "Heart and vascular care department"
+        }
       }
     }
   },
   "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Get service health status",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service is healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/register": {
       "post": {
-        "summary": "Register a patient account"
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Register a patient account",
+        "operationId": "registerPatient",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterPatientRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Patient registered; verification email has been issued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterPatientResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
       }
     },
     "/api/auth/login": {
       "post": {
-        "summary": "Authenticate and issue access/refresh tokens"
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Authenticate with email or username and issue tokens",
+        "operationId": "login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
       }
     },
     "/api/auth/refresh": {
       "post": {
-        "summary": "Rotate refresh token and issue a new access token"
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Rotate refresh token and issue a new access token",
+        "operationId": "refreshToken",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token rotation succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
       }
     },
     "/api/auth/logout": {
       "post": {
-        "summary": "Revoke a refresh token"
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Revoke a refresh token",
+        "operationId": "logout",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              },
+              "example": {
+                "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refresh token revoked if it exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
       }
     },
     "/api/auth/verify-email": {
       "post": {
-        "summary": "Verify account email"
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Verify account email using a one-time token in the request body",
+        "operationId": "verifyEmail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Email verified successfully."
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
       },
       "get": {
-        "summary": "Verify account email from emailed link"
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Verify account email from an emailed link",
+        "operationId": "verifyEmailLink",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "raw-one-time-token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email verified.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Email verified successfully."
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
       }
     },
     "/api/auth/resend-verification": {
       "post": {
-        "summary": "Send a new verification email"
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Send a new verification email",
+        "operationId": "resendVerification",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification email request accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "examples": {
+                  "resent": {
+                    "value": {
+                      "success": true,
+                      "message": "Verification link has been re-issued."
+                    }
+                  },
+                  "alreadyVerified": {
+                    "value": {
+                      "success": true,
+                      "message": "Email is already verified."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
       }
     },
     "/api/auth/forgot-password": {
       "post": {
-        "summary": "Send password reset email"
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Send password reset email",
+        "operationId": "forgotPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset request accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "examples": {
+                  "issued": {
+                    "value": {
+                      "success": true,
+                      "message": "Password reset link has been issued."
+                    }
+                  },
+                  "generic": {
+                    "value": {
+                      "success": true,
+                      "message": "If the email exists, a reset link was sent."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
       }
     },
     "/api/auth/reset-password": {
       "post": {
-        "summary": "Reset password with one-time token"
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Reset password with a one-time token",
+        "operationId": "resetPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Password has been reset successfully."
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
       }
     },
     "/api/auth/change-password": {
       "post": {
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Change password for the authenticated user",
+        "operationId": "changePassword",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed and active refresh tokens revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Password changed successfully. Please sign in again on your devices."
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/api/auth/me": {
       "get": {
-        "summary": "Get current auth user",
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Get current authenticated user with roles and permissions",
+        "operationId": "getCurrentAuthUser",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authenticated user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/api/auth/sessions": {
       "get": {
-        "summary": "List active sessions",
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "List active sessions for the authenticated user",
+        "operationId": "listMySessions",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "Active sessions ordered by creation time descending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Session"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
       }
     },
     "/api/auth/sessions/{id}": {
       "delete": {
-        "summary": "Revoke one of the current user's sessions",
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Revoke one active session owned by the authenticated user",
+        "operationId": "revokeMySession",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "d24f9ffc-b7aa-4c50-8ac3-a9a7a6c8aa09"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/api/auth/admin/sessions/{id}": {
       "delete": {
-        "summary": "Admin revoke any session",
+        "tags": [
+          "Admin",
+          "Sessions"
+        ],
+        "summary": "Admin revoke any active session",
+        "operationId": "adminRevokeSession",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "d24f9ffc-b7aa-4c50-8ac3-a9a7a6c8aa09"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "success": true
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/api/auth/admin/users": {
       "post": {
-        "summary": "Admin create a user/staff identity account",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin create a user or staff identity account",
+        "operationId": "adminCreateUser",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdminUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User account created and roles assigned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateAdminUserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
       }
     },
     "/api/users/me": {
       "get": {
-        "summary": "Get current user profile",
+        "tags": [
+          "Users"
+        ],
+        "summary": "Get the current user's profile",
+        "operationId": "getMyProfile",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user's public profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       },
       "patch": {
-        "summary": "Update current user profile",
+        "tags": [
+          "Users"
+        ],
+        "summary": "Update the current user's profile",
+        "operationId": "updateMyProfile",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated public profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     },
     "/api/users/doctors": {
       "get": {
+        "tags": [
+          "Users"
+        ],
         "summary": "List active doctors",
+        "operationId": "listDoctors",
         "security": [
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "Active users with the Doctor role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Doctor"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/departments": {
+      "post": {
+        "tags": [
+          "Departments"
+        ],
+        "summary": "Create a department",
+        "operationId": "createDepartment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDepartmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Department created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Department"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/departments/{id}": {
+      "get": {
+        "tags": [
+          "Departments"
+        ],
+        "summary": "Get a department by ID",
+        "operationId": "getDepartmentById",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "bf05b0c0-cd85-49d4-b189-934f720b8b0f"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Department found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Department"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
       }
     }
   }
