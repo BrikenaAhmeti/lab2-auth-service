@@ -27,7 +27,7 @@ const registerSchema = z.object({
     phone: z.string().optional(),
     dateOfBirth: z.string().optional(),
     gender: z.string().optional(),
-    personalNumber: z.string().optional(),
+    personalNumber: z.string().trim().min(1).max(50),
 });
 
 const loginSchema = z.object({
@@ -39,9 +39,16 @@ const refreshSchema = z.object({
     refreshToken: z.string().min(1),
 });
 
-const verifyEmailSchema = z.object({
-    token: z.string().min(1),
-});
+const verifyEmailSchema = z
+    .object({
+        token: z.string().trim().min(1).optional(),
+        email: z.email().optional(),
+        code: z.string().trim().regex(/^\d{6}$/).optional(),
+    })
+    .refine((value) => Boolean(value.token || (value.email && value.code)), {
+        message: 'Provide either token or email and code',
+        path: ['code'],
+    });
 
 const verifyEmailQuerySchema = z.object({
     token: z.string().min(1),
@@ -79,7 +86,7 @@ const createAdminUserSchema = z.object({
     phone: z.string().optional(),
     dateOfBirth: z.string().optional(),
     gender: z.string().optional(),
-    personalNumber: z.string().optional(),
+    personalNumber: z.string().trim().min(1).max(50).optional(),
 });
 
 export class AuthController {
@@ -145,6 +152,8 @@ export class AuthController {
 
         const result = await this.service.verifyEmail({
             token: body.token,
+            email: body.email,
+            code: body.code,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
         });

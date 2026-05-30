@@ -7,6 +7,7 @@ function createMocks() {
         findById: jest.fn(),
         findByEmail: jest.fn(),
         findByUsername: jest.fn(),
+        findByPersonalNumber: jest.fn(),
         findDoctors: jest.fn(),
         updateMyProfile: jest.fn(),
     };

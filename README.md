@@ -220,9 +220,9 @@ Each module follows:
 
 Implemented flows:
 
-- Patient registration with strong password rules (12+ chars, upper/lower/number/special)
+- Patient registration with required personal number and strong password rules (12+ chars, upper/lower/number/special)
 - Admin-managed user/staff account creation with role assignment
-- Email verification token flow (`/api/auth/verify-email`, `/api/auth/resend-verification`)
+- Email verification code flow (`/api/auth/verify-email`, `/api/auth/resend-verification`)
 - Login with JWT access token (15 minutes) + refresh token (7 days)
 - Login accepts either email address or username in the existing `email` request field
 - Refresh token hashing, rotation, revocation, and active session listing/revocation

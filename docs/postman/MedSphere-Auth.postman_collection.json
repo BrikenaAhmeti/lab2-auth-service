@@ -169,7 +169,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"{{verificationToken}}\"\n}",
+              "raw": "{\n  \"email\": \"arta.patient@example.com\",\n  \"code\": \"{{verificationCode}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -190,7 +190,7 @@
           }
         },
         {
-          "name": "Verify Email Link",
+          "name": "Verify Email Link (Legacy)",
           "request": {
             "method": "GET",
             "url": {
@@ -756,6 +756,10 @@
     },
     {
       "key": "verificationToken",
+      "value": ""
+    },
+    {
+      "key": "verificationCode",
       "value": ""
     },
     {

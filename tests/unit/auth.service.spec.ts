@@ -10,6 +10,7 @@ function createMocks() {
         findById: jest.fn(),
         findByEmail: jest.fn(),
         findByUsername: jest.fn(),
+        findByPersonalNumber: jest.fn(),
         findDoctors: jest.fn(),
         updateMyProfile: jest.fn(),
     };
@@ -268,6 +269,7 @@ describe('AuthService', () => {
 
         m.userRepository.findByEmail.mockResolvedValue(null);
         m.userRepository.findByUsername.mockResolvedValue(null);
+        m.userRepository.findByPersonalNumber.mockResolvedValue(null);
         m.authRepository.findRolesByNames.mockResolvedValue([{ id: 'role-patient', name: 'Patient' }]);
         m.authRepository.assignRolesToUser.mockResolvedValue();
         m.passwordService.hash.mockResolvedValue('hashed-password');
@@ -288,17 +290,50 @@ describe('AuthService', () => {
             email: 'john@demo.local',
             username: 'John',
             password: 'StrongPass123!',
+            personalNumber: ' 1234567890 ',
         });
 
         expect(result.user.email).toBe('john@demo.local');
         expect(result.user.username).toBe('john');
         expect(m.userRepository.findByUsername).toHaveBeenCalledWith('john');
-        expect(m.authRepository.createEmailVerificationToken).toHaveBeenCalled();
+        expect(m.userRepository.findByPersonalNumber).toHaveBeenCalledWith('1234567890');
+        expect(m.userRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({ personalNumber: '1234567890' }),
+        );
+        expect(m.tokenHashService.hash).toHaveBeenCalledWith(expect.stringMatching(/^u100:\d{6}$/));
+        expect(m.authRepository.createEmailVerificationToken).toHaveBeenCalledWith(
+            expect.objectContaining({ tokenHash: 'verify-hash' }),
+        );
         expect(m.authRepository.assignRolesToUser).toHaveBeenCalledWith('u100', ['role-patient']);
         expect(m.emailService.send).toHaveBeenCalled();
         expect(m.emailService.send.mock.calls[0][0].text).toContain(
-            'http://localhost:3005/api/auth/verify-email?token=',
+            'Your verification code is:',
         );
+    });
+
+    it('requires personal number when a patient registers', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        await expect(
+            service.registerPatient({
+                firstName: 'John',
+                lastName: 'Doe',
+                email: 'john@demo.local',
+                password: 'StrongPass123!',
+                personalNumber: ' ',
+            }),
+        ).rejects.toBeInstanceOf(AppError);
+
+        expect(m.userRepository.create).not.toHaveBeenCalled();
     });
 
     it('verifies email with valid token', async () => {
@@ -324,6 +359,41 @@ describe('AuthService', () => {
         const result = await service.verifyEmail({ token: 'raw-token' });
 
         expect(result.success).toBe(true);
+        expect(m.authRepository.markUserEmailVerified).toHaveBeenCalledWith('u1');
+    });
+
+    it('verifies email with email and one-time code', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        m.userRepository.findByEmail.mockResolvedValue({
+            id: 'u1',
+            email: 'patient@demo.local',
+            emailVerifiedAt: null,
+        });
+        m.tokenHashService.hash.mockReturnValue('verify-hash');
+        m.authRepository.findValidEmailVerificationToken.mockResolvedValue({
+            id: 'evt1',
+            userId: 'u1',
+        });
+        m.authRepository.markEmailVerificationTokenUsed.mockResolvedValue();
+        m.authRepository.markUserEmailVerified.mockResolvedValue();
+
+        const result = await service.verifyEmail({
+            email: ' Patient@Demo.Local ',
+            code: '123456',
+        });
+
+        expect(result.success).toBe(true);
+        expect(m.tokenHashService.hash).toHaveBeenCalledWith('u1:123456');
         expect(m.authRepository.markUserEmailVerified).toHaveBeenCalledWith('u1');
     });
 

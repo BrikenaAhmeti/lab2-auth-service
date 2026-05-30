@@ -50,6 +50,30 @@ export class AuthService {
         return normalized;
     }
 
+    private normalizePersonalNumber(personalNumber?: string | null) {
+        const normalized = personalNumber?.trim();
+
+        if (!normalized) {
+            throw new AppError('Personal number is required for patient registration', 400);
+        }
+
+        if (normalized.length > 50) {
+            throw new AppError('Personal number must be at most 50 characters', 400);
+        }
+
+        return normalized;
+    }
+
+    private normalizeVerificationCode(code?: string | null) {
+        const normalized = code?.trim();
+
+        if (!normalized || !/^\d{6}$/.test(normalized)) {
+            throw new AppError('Verification code must be 6 digits', 400);
+        }
+
+        return normalized;
+    }
+
     private createOneTimeToken(hoursToExpire: number) {
         const rawToken = crypto.randomBytes(32).toString('hex');
         const tokenHash = this.tokenHashService.hash(rawToken);
@@ -59,26 +83,37 @@ export class AuthService {
         return { rawToken, tokenHash, expiresAt };
     }
 
+    private createEmailVerificationCode(minutesToExpire: number) {
+        const rawCode = crypto.randomInt(100000, 1000000).toString();
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + minutesToExpire);
+
+        return { rawCode, expiresAt };
+    }
+
+    private hashEmailVerificationCode(userId: string, code: string) {
+        return this.tokenHashService.hash(`${userId}:${code}`);
+    }
+
     private buildTokenUrl(baseUrl: string, token: string) {
         const url = new URL(baseUrl);
         url.searchParams.set('token', token);
         return url.toString();
     }
 
-    private async sendVerificationEmail(email: string, token: string) {
-        const verifyUrl = this.buildTokenUrl(env.emailVerificationUrl, token);
+    private async sendVerificationEmail(email: string, code: string) {
         await this.emailService.send({
             to: email,
             subject: 'Verify your MedSphere account',
             text: [
                 'Welcome to MedSphere.',
-                `Verify your account by opening this link: ${verifyUrl}`,
-                'This link expires in 24 hours.',
+                `Your verification code is: ${code}`,
+                'This code expires in 15 minutes.',
             ].join('\n\n'),
             html: [
                 '<p>Welcome to MedSphere.</p>',
-                `<p><a href="${verifyUrl}">Verify your email address</a></p>`,
-                '<p>This link expires in 24 hours.</p>',
+                `<p>Your verification code is <strong>${code}</strong>.</p>`,
+                '<p>This code expires in 15 minutes.</p>',
             ].join(''),
         });
     }
@@ -101,13 +136,14 @@ export class AuthService {
         phone?: string;
         dateOfBirth?: Date;
         gender?: string;
-        personalNumber?: string;
+        personalNumber: string;
         username?: string;
         ipAddress?: string;
         userAgent?: string;
     }) {
         const email = input.email.trim().toLowerCase();
         const username = this.normalizeUsername(input.username);
+        const personalNumber = this.normalizePersonalNumber(input.personalNumber);
 
         const existing = await this.userRepository.findByEmail(email);
         if (existing) {
@@ -119,6 +155,12 @@ export class AuthService {
             if (existingUsername) {
                 throw new AppError('Username already in use', 409);
             }
+        }
+
+        const existingPersonalNumber =
+            await this.userRepository.findByPersonalNumber(personalNumber);
+        if (existingPersonalNumber) {
+            throw new AppError('Personal number already in use', 409);
         }
 
         this.assertPasswordComplexity(input.password);
@@ -133,7 +175,7 @@ export class AuthService {
             phone: input.phone?.trim(),
             dateOfBirth: input.dateOfBirth,
             gender: input.gender,
-            personalNumber: input.personalNumber,
+            personalNumber,
             isActive: false,
             emailVerifiedAt: null,
         });
@@ -144,13 +186,13 @@ export class AuthService {
         }
         await this.authRepository.assignRolesToUser(user.id, [patientRoles[0].id]);
 
-        const verification = this.createOneTimeToken(24);
+        const verification = this.createEmailVerificationCode(15);
         await this.authRepository.createEmailVerificationToken({
             userId: user.id,
-            tokenHash: verification.tokenHash,
+            tokenHash: this.hashEmailVerificationCode(user.id, verification.rawCode),
             expiresAt: verification.expiresAt,
         });
-        await this.sendVerificationEmail(user.email, verification.rawToken);
+        await this.sendVerificationEmail(user.email, verification.rawCode);
 
         await this.auditLogService.log({
             userId: user.id,
@@ -168,7 +210,7 @@ export class AuthService {
         });
 
         return {
-            message: 'Registration successful. Verify your email to activate the account.',
+            message: 'Registration successful. Check your email for the verification code to activate the account.',
             user: {
                 id: user.id,
                 firstName: user.firstName,
@@ -455,16 +497,38 @@ export class AuthService {
     }
 
     async verifyEmail(input: {
-        token: string;
+        token?: string;
+        email?: string;
+        code?: string;
         ipAddress?: string;
         userAgent?: string;
     }) {
-        const tokenHash = this.tokenHashService.hash(input.token);
-        const verificationToken =
-            await this.authRepository.findValidEmailVerificationToken(tokenHash);
+        let verificationToken: any | null = null;
+
+        if (input.email && input.code) {
+            const email = input.email.trim().toLowerCase();
+            const code = this.normalizeVerificationCode(input.code);
+            const user = await this.userRepository.findByEmail(email);
+
+            if (!user) {
+                throw new AppError('Invalid or expired verification code', 400);
+            }
+
+            if (user.emailVerifiedAt) {
+                return { success: true, message: 'Email is already verified.' };
+            }
+
+            verificationToken = await this.authRepository.findValidEmailVerificationToken(
+                this.hashEmailVerificationCode(user.id, code),
+            );
+        } else if (input.token) {
+            const tokenHash = this.tokenHashService.hash(input.token);
+            verificationToken =
+                await this.authRepository.findValidEmailVerificationToken(tokenHash);
+        }
 
         if (!verificationToken) {
-            throw new AppError('Invalid or expired verification token', 400);
+            throw new AppError('Invalid or expired verification code', 400);
         }
 
         await this.authRepository.markEmailVerificationTokenUsed(verificationToken.id);
@@ -490,7 +554,7 @@ export class AuthService {
         const user = await this.userRepository.findByEmail(input.email.trim().toLowerCase());
 
         if (!user) {
-            return { success: true, message: 'If the email exists, a verification link was sent.' };
+            return { success: true, message: 'If the email exists, a verification code was sent.' };
         }
 
         if (user.emailVerifiedAt) {
@@ -499,13 +563,13 @@ export class AuthService {
 
         await this.authRepository.invalidateEmailVerificationTokens(user.id);
 
-        const verification = this.createOneTimeToken(24);
+        const verification = this.createEmailVerificationCode(15);
         await this.authRepository.createEmailVerificationToken({
             userId: user.id,
-            tokenHash: verification.tokenHash,
+            tokenHash: this.hashEmailVerificationCode(user.id, verification.rawCode),
             expiresAt: verification.expiresAt,
         });
-        await this.sendVerificationEmail(user.email, verification.rawToken);
+        await this.sendVerificationEmail(user.email, verification.rawCode);
 
         await this.auditLogService.log({
             userId: user.id,
@@ -518,7 +582,7 @@ export class AuthService {
 
         return {
             success: true,
-            message: 'Verification link has been re-issued.',
+            message: 'Verification code has been re-issued.',
         };
     }
 
@@ -674,6 +738,18 @@ export class AuthService {
             throw new AppError('One or more roles are invalid', 400);
         }
 
+        const normalizedPersonalNumber = normalizedRoles.includes('Patient')
+            ? this.normalizePersonalNumber(input.personalNumber)
+            : input.personalNumber?.trim() || undefined;
+
+        if (normalizedPersonalNumber) {
+            const existingPersonalNumber =
+                await this.userRepository.findByPersonalNumber(normalizedPersonalNumber);
+            if (existingPersonalNumber) {
+                throw new AppError('Personal number already in use', 409);
+            }
+        }
+
         const passwordHash = await this.passwordService.hash(input.password);
         const user = await this.authRepository.createUserWithRoles(
             {
@@ -685,7 +761,7 @@ export class AuthService {
                 phone: input.phone?.trim(),
                 dateOfBirth: input.dateOfBirth,
                 gender: input.gender,
-                personalNumber: input.personalNumber,
+                personalNumber: normalizedPersonalNumber,
                 createdBy: input.actorUserId,
             },
             roles.map((role) => role.id),

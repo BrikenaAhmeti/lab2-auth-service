@@ -514,7 +514,8 @@
           "firstName",
           "lastName",
           "email",
-          "password"
+          "password",
+          "personalNumber"
         ],
         "properties": {
           "firstName": {
@@ -564,6 +565,8 @@
           },
           "personalNumber": {
             "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
             "example": "1234567890"
           }
         },
@@ -588,7 +591,7 @@
         "properties": {
           "message": {
             "type": "string",
-            "example": "Registration successful. Verify your email to activate the account."
+            "example": "Registration successful. Check your email for the verification code to activate the account."
           },
           "user": {
             "allOf": [
@@ -646,17 +649,41 @@
           }
         }
       },
-      "TokenRequest": {
-        "type": "object",
-        "required": [
-          "token"
-        ],
-        "properties": {
-          "token": {
-            "type": "string",
-            "example": "raw-one-time-token"
+      "VerifyEmailRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "email",
+              "code"
+            ],
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email",
+                "example": "arta.patient@example.com"
+              },
+              "code": {
+                "type": "string",
+                "pattern": "^\\d{6}$",
+                "example": "123456"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Backward-compatible request for legacy emailed links.",
+            "required": [
+              "token"
+            ],
+            "properties": {
+              "token": {
+                "type": "string",
+                "example": "raw-one-time-token"
+              }
+            }
           }
-        }
+        ]
       },
       "EmailRequest": {
         "type": "object",
@@ -907,7 +934,7 @@
         },
         "responses": {
           "201": {
-            "description": "Patient registered; verification email has been issued.",
+            "description": "Patient registered; verification code email has been issued.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1056,14 +1083,14 @@
         "tags": [
           "Authentication"
         ],
-        "summary": "Verify account email using a one-time token in the request body",
+        "summary": "Verify account email using email and a one-time code",
         "operationId": "verifyEmail",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TokenRequest"
+                "$ref": "#/components/schemas/VerifyEmailRequest"
               }
             }
           }
@@ -1095,7 +1122,7 @@
         "tags": [
           "Authentication"
         ],
-        "summary": "Verify account email from an emailed link",
+        "summary": "Verify account email from a legacy emailed link",
         "operationId": "verifyEmailLink",
         "parameters": [
           {
@@ -1137,7 +1164,7 @@
         "tags": [
           "Authentication"
         ],
-        "summary": "Send a new verification email",
+        "summary": "Send a new verification code email",
         "operationId": "resendVerification",
         "requestBody": {
           "required": true,
@@ -1151,7 +1178,7 @@
         },
         "responses": {
           "200": {
-            "description": "Verification email request accepted.",
+            "description": "Verification code email request accepted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1161,7 +1188,7 @@
                   "resent": {
                     "value": {
                       "success": true,
-                      "message": "Verification link has been re-issued."
+                      "message": "Verification code has been re-issued."
                     }
                   },
                   "alreadyVerified": {

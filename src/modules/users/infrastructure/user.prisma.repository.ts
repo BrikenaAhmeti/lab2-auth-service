@@ -30,6 +30,12 @@ export class UserPrismaRepository implements UserRepository {
         });
     }
 
+    async findByPersonalNumber(personalNumber: string): Promise<any | null> {
+        return prisma.user.findUnique({
+            where: { personalNumber },
+        });
+    }
+
     async findDoctors(): Promise<any[]> {
         return prisma.user.findMany({
             where: {
