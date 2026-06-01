@@ -124,7 +124,7 @@ APP_BASE_URL=http://localhost:3005
 EMAIL_VERIFICATION_URL=http://localhost:3005/api/auth/verify-email
 PASSWORD_RESET_URL=http://localhost:5173/reset-password
 
-EMAIL_FROM=your-gmail@gmail.com
+EMAIL_FROM=medsphere@noreply.com
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=false
@@ -221,16 +221,17 @@ Each module follows:
 Implemented flows:
 
 - Patient registration with required personal number and strong password rules (12+ chars, upper/lower/number/special)
-- Admin-managed user/staff account creation with role assignment
+- Admin-managed user/staff account creation with backend-generated temporary password emailed to the user
 - Email verification code flow (`/api/auth/verify-email`, `/api/auth/resend-verification`)
 - Login with JWT access token (15 minutes) + refresh token (7 days)
 - Login accepts either email address or username in the existing `email` request field
 - Refresh token hashing, rotation, revocation, and active session listing/revocation
 - Forgot/reset password flow (`/api/auth/forgot-password`, `/api/auth/reset-password`)
 - Authenticated password change flow (`/api/auth/change-password`)
+- Current user profile management (`GET /api/users/me`, `PATCH /api/users/me`) for phone, date of birth, gender, avatar, and name updates
 - RBAC middleware for protected routes (auth, role, and permission checks)
 - Auth endpoint rate limiting
-- Email delivery via Gmail/SMTP when `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASS` are configured
+- Email delivery via Gmail/SMTP when `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASS` are configured, using `EMAIL_FROM` (default `medsphere@noreply.com`) as the visible sender
 - Email delivery via Resend when `RESEND_API_KEY` is configured, with console preview fallback in local development
 
 Auth API artifacts:

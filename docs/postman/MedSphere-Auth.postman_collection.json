@@ -464,7 +464,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Doctor\",\n  \"email\": \"ana.doctor@medsphere.local\",\n  \"username\": \"ana.doctor\",\n  \"password\": \"DoctorPass123!\",\n  \"roles\": [\"Doctor\"],\n  \"phone\": \"+38344111222\"\n}",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Doctor\",\n  \"email\": \"ana.doctor@medsphere.local\",\n  \"username\": \"ana.doctor\",\n  \"roles\": [\"Doctor\"],\n  \"phone\": \"+38344111222\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

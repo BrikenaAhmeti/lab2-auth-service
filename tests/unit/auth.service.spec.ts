@@ -44,6 +44,7 @@ function createMocks() {
     const passwordService = {
         hash: jest.fn(),
         compare: jest.fn(),
+        generateTemporaryPassword: jest.fn(),
     };
 
     const jwtService = {
@@ -582,6 +583,7 @@ describe('AuthService', () => {
         m.authRepository.findRolesByNames.mockResolvedValue([
             { id: 'r1', name: 'Doctor' },
         ]);
+        m.passwordService.generateTemporaryPassword.mockReturnValue('TempPassword123!');
         m.passwordService.hash.mockResolvedValue('admin-created-hash');
         m.authRepository.createUserWithRoles.mockResolvedValue({
             id: 'u200',
@@ -599,13 +601,20 @@ describe('AuthService', () => {
             lastName: 'Doctor',
             email: 'doctor2@medsphere.local',
             username: 'Doctor2',
-            password: 'DoctorPass123!',
             roles: ['Doctor'],
         });
 
         expect(result.user.roles).toEqual(['Doctor']);
         expect(result.user.username).toBe('doctor2');
         expect(m.userRepository.findByUsername).toHaveBeenCalledWith('doctor2');
+        expect(m.passwordService.hash).toHaveBeenCalledWith('TempPassword123!');
         expect(m.authRepository.createUserWithRoles).toHaveBeenCalled();
+        expect(m.emailService.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+                to: 'doctor2@medsphere.local',
+                subject: 'Your MedSphere account is ready',
+                text: expect.stringContaining('Temporary password: TempPassword123!'),
+            }),
+        );
     });
 });
