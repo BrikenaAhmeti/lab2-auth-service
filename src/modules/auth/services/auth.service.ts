@@ -117,6 +117,27 @@ export class AuthService {
         return url.toString();
     }
 
+    private serializeEmailError(error: unknown) {
+        if (!(error instanceof Error)) {
+            return String(error);
+        }
+
+        const details = error as Error & {
+            code?: string;
+            command?: string;
+            response?: string;
+            responseCode?: number;
+        };
+
+        return [
+            `message="${error.message}"`,
+            details.code ? `code=${details.code}` : undefined,
+            details.command ? `command=${details.command}` : undefined,
+            details.responseCode ? `responseCode=${details.responseCode}` : undefined,
+            details.response ? `response="${details.response}"` : undefined,
+        ].filter(Boolean).join(' ');
+    }
+
     private async sendVerificationEmail(email: string, code: string) {
         console.info(
             `[auth] verification_email send_start recipient=${email} provider=${this.getEmailProviderName()}`,
@@ -143,11 +164,23 @@ export class AuthService {
     private async sendVerificationEmailForFlow(email: string, code: string) {
         try {
             await this.sendVerificationEmail(email, code);
-            return { delivered: this.isEmailDeliveryConfigured(), error: undefined };
+            if (!this.isEmailDeliveryConfigured()) {
+                const error = new Error('Email delivery is not configured');
+
+                if (this.isProduction()) {
+                    throw error;
+                }
+
+                console.error(
+                    `[auth] verification_email send_failure recipient=${email} provider=${this.getEmailProviderName()} ${this.serializeEmailError(error)}`,
+                );
+                return { delivered: false, error };
+            }
+
+            return { delivered: true, error: undefined };
         } catch (error) {
             console.error(
-                `[auth] verification_email send_failure recipient=${email} provider=${this.getEmailProviderName()}`,
-                error,
+                `[auth] verification_email send_failure recipient=${email} provider=${this.getEmailProviderName()} ${this.serializeEmailError(error)}`,
             );
 
             if (this.isProduction()) {

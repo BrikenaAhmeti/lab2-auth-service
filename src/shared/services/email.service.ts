@@ -14,6 +14,27 @@ export interface EmailService {
     isDeliveryConfigured?(): boolean;
 }
 
+function serializeEmailError(error: unknown) {
+    if (!(error instanceof Error)) {
+        return String(error);
+    }
+
+    const details = error as Error & {
+        code?: string;
+        command?: string;
+        response?: string;
+        responseCode?: number;
+    };
+
+    return [
+        `message="${error.message}"`,
+        details.code ? `code=${details.code}` : undefined,
+        details.command ? `command=${details.command}` : undefined,
+        details.responseCode ? `responseCode=${details.responseCode}` : undefined,
+        details.response ? `response="${details.response}"` : undefined,
+    ].filter(Boolean).join(' ');
+}
+
 class ConsoleEmailService implements EmailService {
     getProviderName() {
         return 'console';
@@ -108,16 +129,31 @@ class SmtpEmailService implements EmailService {
                 `[email] provider=smtp to=${input.to} messageId=${info.messageId ?? 'unknown'} accepted=${info.accepted?.join(',') ?? ''} rejected=${info.rejected?.join(',') ?? ''} request=succeeded`,
             );
         } catch (error) {
-            console.error(`[email] provider=smtp to=${input.to} request=failed`, error);
+            console.error(
+                `[email] provider=smtp to=${input.to} request=failed ${serializeEmailError(error)}`,
+            );
             throw error;
         }
     }
 }
 
 export function createEmailService(): EmailService {
+    console.info(
+        [
+            '[email] startup',
+            `smtpHost=${env.smtpHost || '[missing]'}`,
+            `smtpPort=${env.smtpPort}`,
+            `smtpSecure=${env.smtpSecure}`,
+            `smtpUserConfigured=${Boolean(env.smtpUser)}`,
+            `smtpPassConfigured=${Boolean(env.smtpPass)}`,
+            `emailFrom=${env.emailFrom}`,
+            `resendConfigured=${Boolean(env.resendApiKey)}`,
+        ].join(' '),
+    );
+
     if (env.smtpHost && env.smtpUser && env.smtpPass) {
         console.info(
-            `[email] provider=smtp configured host=${env.smtpHost} port=${env.smtpPort} secure=${env.smtpSecure} from=${env.emailFrom} user=${env.smtpUser}`,
+            `[email] provider=smtp configured host=${env.smtpHost} port=${env.smtpPort} secure=${env.smtpSecure} from=${env.emailFrom} userConfigured=true passConfigured=true`,
         );
         return new SmtpEmailService();
     }
