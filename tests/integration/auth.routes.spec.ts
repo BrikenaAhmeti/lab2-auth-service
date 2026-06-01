@@ -134,7 +134,7 @@ describe('Auth routes', () => {
                 permissions: ['users:create:all', 'users:deactivate:all', 'users:read:all', 'users:update:all'],
             });
 
-        jest
+        const createSpy = jest
             .spyOn(AuthService.prototype, 'createAdminUser')
             .mockResolvedValue({
                 message: 'User account created successfully.',
@@ -158,12 +158,12 @@ describe('Auth routes', () => {
                 firstName: 'Ana',
                 lastName: 'Doctor',
                 email: 'doctor2@medsphere.local',
-                password: 'DoctorPass123!',
                 roles: ['Doctor'],
             });
 
         expect(response.status).toBe(201);
         expect(response.body.user.email).toBe('doctor2@medsphere.local');
+        expect(createSpy.mock.calls[0][0]).not.toHaveProperty('password');
     });
 
     it('verifies email from emailed link query token', async () => {

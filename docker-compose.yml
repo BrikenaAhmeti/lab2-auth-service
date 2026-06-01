@@ -55,7 +55,7 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-with-auth-service-access-secret}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-with-auth-service-refresh-secret}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3005}
-      EMAIL_FROM: ${EMAIL_FROM:-noreply@medsphere.local}
+      EMAIL_FROM: ${EMAIL_FROM:-medsphere@noreply.com}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
     ports:
       - "${AUTH_SERVICE_PORT:-3005}:3005"
