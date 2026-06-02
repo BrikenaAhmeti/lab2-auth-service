@@ -463,7 +463,12 @@ describe('AuthService', () => {
             email: 'user@demo.local',
         });
         expect(requestResult.success).toBe(true);
-        expect(m.emailService.send).toHaveBeenCalled();
+        expect(m.emailService.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+                text: expect.stringContaining('medspheremobile://reset-password?token='),
+                html: expect.stringContaining('medspheremobile://reset-password?token='),
+            }),
+        );
 
         m.authRepository.findValidPasswordResetToken.mockResolvedValue({
             id: 'prt1',

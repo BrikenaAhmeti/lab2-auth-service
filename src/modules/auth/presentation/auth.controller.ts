@@ -62,10 +62,16 @@ const forgotPasswordSchema = z.object({
     email: z.email(),
 });
 
-const resetPasswordSchema = z.object({
-    token: z.string().min(1),
-    newPassword: z.string().min(12).max(100),
-});
+const resetPasswordSchema = z
+    .object({
+        token: z.string().min(1),
+        password: z.string().min(12).max(100).optional(),
+        newPassword: z.string().min(12).max(100).optional(),
+    })
+    .refine((body) => body.password || body.newPassword, {
+        message: 'password or newPassword is required',
+        path: ['password'],
+    });
 
 const logoutSchema = z.object({
     refreshToken: z.string().min(1),
@@ -202,7 +208,7 @@ export class AuthController {
 
         const result = await this.service.resetPassword({
             token: body.token,
-            newPassword: body.newPassword,
+            newPassword: body.password ?? body.newPassword!,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
         });
