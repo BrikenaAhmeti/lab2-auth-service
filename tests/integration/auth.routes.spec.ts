@@ -351,8 +351,17 @@ describe('Auth routes', () => {
         expect(response.body.paths['/api/auth/login']).toBeDefined();
         expect(response.body.paths['/health']).toBeDefined();
         expect(response.body.paths['/departments/{id}']).toBeDefined();
+        expect(
+            response.body.paths['/internal/auth/contact-acknowledgement'],
+        ).toBeDefined();
+        expect(response.body.paths['/internal/users/profiles']).toBeDefined();
         expect(response.body.components.securitySchemes.bearerAuth).toBeDefined();
+        expect(response.body.components.securitySchemes.internalApiKey).toBeDefined();
         expect(response.body.components.schemas.LoginRequest).toBeDefined();
+        expect(
+            response.body.components.schemas.ContactAcknowledgementRequest,
+        ).toBeDefined();
+        expect(response.body.components.schemas.InternalProfilesRequest).toBeDefined();
     });
 
     it('serves the swagger ui page', async () => {
