@@ -1,295 +1,145 @@
-# Express + TypeScript + CQRS + Prisma
+# MedSphere Auth Service
 
-## Overview
+Auth and identity microservice for Lab2 MedSphere. It owns patient registration, login, refresh tokens, email verification, password reset, session management, current-user profile updates, admin user creation, doctor directory reads, and internal identity lookup/email handoff endpoints used by other services.
 
-This project is a **backend template** built with:
+## Port
 
-- Node.js + Express
-- TypeScript
-- PostgreSQL (via Prisma ORM)
-- CQRS (Command Query Responsibility Segregation)
-- Layered architecture (Controller → Handler → Service → Repository)
+- Local and Docker API: `http://localhost:3005`
+- Container port: `3005`
+- Health: `GET /health`
 
-It is designed as a **scalable, production-ready foundation** for building APIs with clean separation of concerns and testability.
+## Data Stores
 
----
+- PostgreSQL via Prisma.
+- Docker Compose starts a dedicated `postgres` container and runs migrations before the API starts.
 
-## Architecture
+Owned data includes users, roles, permissions, refresh/session state, email verification/reset tokens, audit logs, and the currently hosted department endpoints.
 
-This template follows a **layered CQRS architecture**:
+## Environment Keys
 
-### Write flow (Commands)
+Copy `.env.example` to `.env`.
 
-Controller → Command → CommandHandler → Service → Repository → Prisma → PostgreSQL
+Service keys:
 
-### Read flow (Queries)
+- `NODE_ENV`
+- `PORT`
+- `APP_BASE_URL`
+- `EMAIL_VERIFICATION_URL`
+- `PASSWORD_RESET_URL`
+- `JWT_ACCESS_SECRET`
+- `JWT_REFRESH_SECRET`
+- `EMAIL_FROM`
+- `CORE_SERVICE_URL`
+- `INTERNAL_API_KEY`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `RESEND_API_KEY`
+- `DATABASE_URL`
 
-Controller → Query → QueryHandler → Service → Repository → Prisma → PostgreSQL
+Docker/Postgres helper keys:
 
----
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_DB`
+- `POSTGRES_PORT`
+- `AUTH_SERVICE_PORT`
+- `CORE_SERVICE_URL_DOCKER`
 
-## Project Structure
-
-```
-src/
-  app.ts
-  server.ts
-
-  config/
-    env.ts
-
-  infrastructure/
-    db/
-      prisma.ts
-
-  shared/
-    core/
-      buses/
-        command-bus.ts
-        query-bus.ts
-      errors/
-        app-error.ts
-      types/
-        request-with-user.ts
-    middleware/
-      error-handler.ts
-      not-found.ts
-
-  modules/
-    departments/
-      application/
-        commands/
-        queries/
-        handlers/
-      services/
-      domain/
-      infrastructure/
-      presentation/
-
-tests/
-  unit/
-  integration/
-
-prisma/
-  schema.prisma
-```
-
----
-
-## Key Concepts
-
-### CQRS
-
-- Commands → modify state
-- Queries → read data
-- Handlers execute business logic via services
-
-### Services
-
-Contain business logic and validation.
-
-### Repositories
-
-Abstract database access using Prisma.
-
-### Prisma
-
-Handles database schema, migrations, and queries.
-
----
-
-## Getting Started
-
-### 1. Install dependencies
+## Start Locally
 
 ```bash
 npm install
-```
-
----
-
-### 2. Setup environment variables
-
-Create a `.env` file:
-
-```env
-PORT=4000
-NODE_ENV=development
-
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app?schema=public"
-
-JWT_ACCESS_SECRET=your_access_secret
-JWT_REFRESH_SECRET=your_refresh_secret
-APP_BASE_URL=http://localhost:3005
-EMAIL_VERIFICATION_URL=http://localhost:3005/api/auth/verify-email
-PASSWORD_RESET_URL=http://localhost:5173/reset-password
-
-EMAIL_FROM=medsphere@noreply.com
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-gmail@gmail.com
-SMTP_PASS=your-gmail-app-password-without-spaces
-RESEND_API_KEY=optional_resend_api_key
-```
-
----
-
-### 3. Setup database
-
-```bash
-npx prisma migrate dev --name init
-npx prisma generate
+cp .env.example .env
+npm run docker:infra
+npm run prisma:generate
+npm run prisma:migrate
 npm run seed
-```
-
----
-
-### 4. Run the project
-
-```bash
 npm run dev
 ```
 
-Server will start on:
+Use `npm run docker:infra:down` to stop only the local Postgres container.
 
-```
-http://localhost:4000
-```
-
-### Docker
-
-Run the full auth service stack:
+## Run With Docker
 
 ```bash
+cp .env.example .env
 npm run docker:up
 ```
 
-Docker runs database migrations and seeds the default users before starting the API.
-
-Default demo logins:
-
-- Admin email: `admin@medsphere.local`
-- Patient email: `patient@medsphere.local`
-- Doctor email: `doctor@medsphere.local`
-- Shared password: `Medsphere@123`
-
----
-
-## Testing
-
-Run tests:
+Stop the stack:
 
 ```bash
+npm run docker:down
+```
+
+Docker starts Postgres, runs `prisma migrate deploy`, runs the seed script, then starts the Auth Service.
+
+## Build And Tests
+
+```bash
+npm run build
 npm run test
 ```
 
-Watch mode:
+Additional test commands:
 
 ```bash
 npm run test:watch
+npm run test:unit
+npm run test:auth
 ```
 
----
+Useful Prisma commands:
 
-## Available Scripts
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:migrate:deploy
+npm run prisma:studio
+npm run seed
+```
 
-| Script                    | Description             |
-| ------------------------- | ----------------------- |
-| `npm run dev`             | Run in development mode |
-| `npm run build`           | Compile TypeScript      |
-| `npm start`               | Run compiled app        |
-| `npm run test`            | Run tests               |
-| `npm run prisma:migrate`  | Run database migrations |
-| `npm run prisma:generate` | Generate Prisma client  |
+## Swagger
 
----
+- Swagger UI: `http://localhost:3005/docs`
+- Swagger UI alias: `http://localhost:3005/api/docs`
+- OpenAPI JSON: `http://localhost:3005/docs/openapi.json`
+- OpenAPI JSON alias: `http://localhost:3005/api/docs/openapi.json`
 
-## Example Module (Departments)
+Swagger covers auth flows, sessions, admin user creation, current-user profile endpoints, doctor directory, department endpoints, and internal service-to-service routes:
 
-Each module follows:
+- `POST /internal/auth/contact-acknowledgement`
+- `POST /internal/users/profiles`
 
-- `domain` → interfaces & entities
-- `repository` → database abstraction
-- `service` → business logic
-- `handlers` → CQRS layer
-- `controller` → HTTP layer
+## Main Routes
 
----
-
-## Authentication
-
-Implemented flows:
-
-- Patient registration with required personal number and strong password rules (12+ chars, upper/lower/number/special)
-- Admin-managed user/staff account creation with backend-generated temporary password emailed to the user
-- Email verification code flow (`/api/auth/verify-email`, `/api/auth/resend-verification`)
-- Login with JWT access token (15 minutes) + refresh token (7 days)
-- Login accepts either email address or username in the existing `email` request field
-- Refresh token hashing, rotation, revocation, and active session listing/revocation
-- Forgot/reset password flow (`/api/auth/forgot-password`, `/api/auth/reset-password`)
-- Authenticated password change flow (`/api/auth/change-password`)
-- Current user profile management (`GET /api/users/me`, `PATCH /api/users/me`) for phone, date of birth, gender, avatar, and name updates
-- RBAC middleware for protected routes (auth, role, and permission checks)
-- Auth endpoint rate limiting
-- Email delivery via Gmail/SMTP when `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASS` are configured, using `EMAIL_FROM` (default `medsphere@noreply.com`) as the visible sender
-- Email delivery via Resend when `RESEND_API_KEY` is configured, with console preview fallback in local development
-
-Auth API artifacts:
-
-- OpenAPI: `docs/openapi/auth.openapi.json`
-- Postman collection: `docs/postman/MedSphere-Auth.postman_collection.json`
-- Swagger UI: `/docs` and `/api/docs`
-
-AI/OpenAI note:
-
-- This auth service does not require OpenAI credentials or an OpenAI SDK. Per the MedSphere plan, OpenAI-backed transcription, summarization, lab interpretation, and reservation-agent features belong in a separate AI service.
-
-Default seeded logins for frontend testing:
-
-- Admin email: `admin@medsphere.local`
-- Patient email: `patient@medsphere.local`
-- Doctor email: `doctor@medsphere.local`
-- Shared password: `Medsphere@123`
-
----
-
-## Extending the Template
-
-To add a new module:
-
-1. Create a folder in `modules/`
-2. Add:
-
-   - commands
-   - queries
-   - handlers
-   - service
-   - repository
-   - controller
-3. Register routes in `app.ts`
-
----
-
-## Tech Stack
-
-- Express
-- TypeScript
-- Prisma
-- PostgreSQL
-- Jest
-- Zod
-
----
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/verify-email`
+- `GET /api/auth/verify-email`
+- `POST /api/auth/resend-verification`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `GET /api/auth/sessions`
+- `GET /api/auth/session-logs`
+- `POST /api/auth/change-password`
+- `DELETE /api/auth/sessions/:id`
+- `DELETE /api/auth/admin/sessions/:id`
+- `POST /api/auth/admin/users`
+- `GET /api/users/doctors`
+- `GET /api/users/me`
+- `PATCH /api/users/me`
+- `POST /departments`
+- `GET /departments/:id`
 
 ## Notes
 
-- Prisma is used as a **schema-first ORM**
-- Business logic remains **code-first in services**
-- Designed to scale into microservices if needed
-
----
-
-## Author
-
-Template created for scalable backend development and academic projects.
+- JWT access and refresh secrets must match frontend/Core/Notification expectations where tokens are verified.
+- `INTERNAL_API_KEY` should match Core, Notifications, CMS, and AI where service-to-service calls are enabled.
+- Email is sent through SMTP when SMTP keys are configured, through Resend when `RESEND_API_KEY` is configured, and falls back to local preview behavior in development.

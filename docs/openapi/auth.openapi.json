@@ -3,7 +3,7 @@
   "info": {
     "title": "MedSphere Auth Service API",
     "version": "1.0.0",
-    "description": "OpenAPI documentation for the MedSphere auth-service backend. This service owns authentication, identity, user profile endpoints, session management, RBAC-protected admin identity operations, and the currently hosted department endpoints."
+    "description": "OpenAPI documentation for the MedSphere Auth Service. This service owns authentication, identity, user profile endpoints, sessions, email flows, RBAC-protected admin identity operations, internal identity lookups, contact acknowledgement email handoff, and the currently hosted department endpoints."
   },
   "servers": [
     {
@@ -35,6 +35,10 @@
     {
       "name": "Departments",
       "description": "Department endpoints currently exposed by this service"
+    },
+    {
+      "name": "Internal",
+      "description": "Service-to-service endpoints secured with x-internal-api-key"
     }
   ],
   "components": {
@@ -44,6 +48,12 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "description": "JWT access token returned by POST /api/auth/login or POST /api/auth/refresh."
+      },
+      "internalApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-internal-api-key",
+        "description": "Shared internal key used for service-to-service Auth Service calls."
       }
     },
     "responses": {
@@ -1067,6 +1077,129 @@
           "name": "Cardiology",
           "description": "Heart and vascular care department"
         }
+      },
+      "ContactAcknowledgementRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "subject"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "example": "Ada Lovelace"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ada@example.com"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "example": "Appointment question"
+          }
+        }
+      },
+      "InternalProfilesRequest": {
+        "type": "object",
+        "required": [
+          "userIds"
+        ],
+        "properties": {
+          "userIds": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": [
+              "22222222-2222-4222-8222-222222222222"
+            ]
+          }
+        }
+      },
+      "InternalUserProfile": {
+        "type": "object",
+        "required": [
+          "id",
+          "userId",
+          "firstName",
+          "lastName",
+          "email",
+          "roles"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Anika"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Rao"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "doctor@medsphere.local"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true,
+            "example": "doctor"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "+38344123456"
+          },
+          "avatarFileId": {
+            "type": "string",
+            "nullable": true,
+            "example": "file_01hv7k7c4m9w8g"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Doctor"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "nullable": true,
+            "example": "doctor"
+          }
+        }
+      },
+      "InternalProfilesResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InternalUserProfile"
+            }
+          }
+        }
       }
     }
   },
@@ -2050,6 +2183,90 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/internal/auth/contact-acknowledgement": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "summary": "Send contact acknowledgement email",
+        "operationId": "sendContactAcknowledgement",
+        "security": [
+          {
+            "internalApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactAcknowledgementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact acknowledgement email was accepted for delivery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/internal/users/profiles": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "summary": "Lookup internal user profiles",
+        "operationId": "getInternalUserProfiles",
+        "security": [
+          {
+            "internalApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalProfilesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Internal user profiles returned in requested unique-id order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalProfilesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
           }
         }
       }
