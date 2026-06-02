@@ -8,6 +8,7 @@ function createMocks() {
     const userRepository: jest.Mocked<UserRepository> = {
         create: jest.fn(),
         findById: jest.fn(),
+        findByIds: jest.fn(),
         findByEmail: jest.fn(),
         findByUsername: jest.fn(),
         findByPersonalNumber: jest.fn(),

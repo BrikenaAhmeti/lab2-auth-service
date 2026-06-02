@@ -1,11 +1,21 @@
 import { Router } from 'express';
 import { UserController } from './user.controller';
 import { authMiddleware } from '../../../shared/middleware/auth.middleware';
+import { requireInternalApiKey } from '../../../shared/middleware/internal-api-key';
 import { requirePermission } from '../../../shared/middleware/require-permission';
 
 const controller = new UserController();
 
 export const userRoutes = Router();
+export const internalUserRoutes = Router();
+
+internalUserRoutes.post('/profiles', requireInternalApiKey, async (req, res, next) => {
+    try {
+        await controller.internalProfiles(req, res);
+    } catch (error) {
+        next(error);
+    }
+});
 
 userRoutes.get('/doctors', authMiddleware, async (req, res, next) => {
     try {

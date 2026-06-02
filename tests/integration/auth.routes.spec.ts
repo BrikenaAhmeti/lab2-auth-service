@@ -290,6 +290,56 @@ describe('Auth routes', () => {
         });
     });
 
+    it('lists internal user profiles only with the shared key', async () => {
+        process.env.INTERNAL_API_KEY = 'auth-internal-test-key';
+        const { UserService } = await import('../../src/modules/users/services/user.service');
+
+        const lookupSpy = jest
+            .spyOn(UserService.prototype, 'getInternalProfiles')
+            .mockResolvedValue([
+                {
+                    id: '22222222-2222-4222-8222-222222222222',
+                    userId: '22222222-2222-4222-8222-222222222222',
+                    firstName: 'Anika',
+                    lastName: 'Rao',
+                    email: 'doctor@medsphere.local',
+                    username: 'doctor',
+                    phone: null,
+                    avatarFileId: null,
+                    roles: ['Doctor'],
+                    role: 'doctor',
+                },
+            ]);
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const rejected = await request(app)
+            .post('/internal/users/profiles')
+            .send({
+                userIds: ['22222222-2222-4222-8222-222222222222'],
+            });
+
+        expect(rejected.status).toBe(401);
+
+        const response = await request(app)
+            .post('/internal/users/profiles')
+            .set('x-internal-api-key', 'auth-internal-test-key')
+            .send({
+                userIds: ['22222222-2222-4222-8222-222222222222'],
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.data[0]).toMatchObject({
+            firstName: 'Anika',
+            lastName: 'Rao',
+            role: 'doctor',
+        });
+        expect(lookupSpy).toHaveBeenCalledWith([
+            '22222222-2222-4222-8222-222222222222',
+        ]);
+    });
+
     it('lists session logs with actor details and filters', async () => {
         const { JwtService } = await import('../../src/shared/services/jwt.service');
         const { AuthService } = await import('../../src/modules/auth/services/auth.service');

@@ -29,6 +29,7 @@ export interface UpdateMyProfileData {
 export interface UserRepository {
     create(data: CreateUserData): Promise<any>;
     findById(id: string): Promise<any | null>;
+    findByIds(ids: string[]): Promise<any[]>;
     findByEmail(email: string): Promise<any | null>;
     findByUsername(username: string): Promise<any | null>;
     findByPersonalNumber(personalNumber: string): Promise<any | null>;
