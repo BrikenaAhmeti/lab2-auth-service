@@ -466,7 +466,12 @@ describe('AuthService', () => {
         expect(m.emailService.send).toHaveBeenCalledWith(
             expect.objectContaining({
                 text: expect.stringContaining('medspheremobile://reset-password?token='),
-                html: expect.stringContaining('medspheremobile://reset-password?token='),
+                html: expect.stringContaining('>Reset password</a>'),
+            }),
+        );
+        expect(m.emailService.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+                html: expect.stringContaining('If the button does not open, copy this link:'),
             }),
         );
 

@@ -213,8 +213,19 @@ export class AuthService {
         await this.emailService.send({
             to: email,
             subject: 'Reset your MedSphere password',
-            text: `Reset your MedSphere password by opening: ${resetUrl}`,
-            html: `<p>Reset your MedSphere password by opening <a href="${resetUrl}">${resetUrl}</a>.</p>`,
+            text: [
+                'Reset your MedSphere password:',
+                resetUrl,
+                '',
+                'If the button does not open, copy this link:',
+                resetUrl,
+            ].join('\n'),
+            html: [
+                '<p>Reset your MedSphere password.</p>',
+                `<p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">Reset password</a></p>`,
+                '<p>If the button does not open, copy this link:</p>',
+                `<p><a href="${resetUrl}">${resetUrl}</a></p>`,
+            ].join(''),
         });
     }
 
