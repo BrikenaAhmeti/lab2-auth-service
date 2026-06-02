@@ -127,6 +127,36 @@ describe('Auth routes', () => {
         );
     });
 
+    it('accepts mobile reset-password payload with code field', async () => {
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+
+        const resetSpy = jest
+            .spyOn(AuthService.prototype, 'resetPassword')
+            .mockResolvedValue({
+                success: true,
+                message: 'Password has been reset successfully.',
+            });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const response = await request(app)
+            .post('/api/auth/reset-password')
+            .send({
+                code: 'raw-reset-code',
+                password: 'ChangedPass123!',
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+        expect(resetSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                token: 'raw-reset-code',
+                newPassword: 'ChangedPass123!',
+            }),
+        );
+    });
+
     it('returns 403 when authenticated user lacks own-profile update permission', async () => {
         const { JwtService } = await import('../../src/shared/services/jwt.service');
         jest

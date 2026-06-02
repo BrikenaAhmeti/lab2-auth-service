@@ -465,13 +465,13 @@ describe('AuthService', () => {
         expect(requestResult.success).toBe(true);
         expect(m.emailService.send).toHaveBeenCalledWith(
             expect.objectContaining({
-                text: expect.stringContaining('medspheremobile://reset-password?token='),
-                html: expect.stringContaining('>Reset password</a>'),
+                text: expect.stringContaining('Your reset code is:'),
+                html: expect.stringContaining('Your reset code is:'),
             }),
         );
         expect(m.emailService.send).toHaveBeenCalledWith(
             expect.objectContaining({
-                html: expect.stringContaining('If the button does not open, copy this link:'),
+                html: expect.stringContaining('medspheremobile://reset-password?token='),
             }),
         );
 

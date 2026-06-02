@@ -64,9 +64,14 @@ const forgotPasswordSchema = z.object({
 
 const resetPasswordSchema = z
     .object({
-        token: z.string().min(1),
+        token: z.string().min(1).optional(),
+        code: z.string().min(1).optional(),
         password: z.string().min(12).max(100).optional(),
         newPassword: z.string().min(12).max(100).optional(),
+    })
+    .refine((body) => body.token || body.code, {
+        message: 'token or code is required',
+        path: ['token'],
     })
     .refine((body) => body.password || body.newPassword, {
         message: 'password or newPassword is required',
@@ -207,7 +212,7 @@ export class AuthController {
         const body = resetPasswordSchema.parse(req.body);
 
         const result = await this.service.resetPassword({
-            token: body.token,
+            token: body.token ?? body.code!,
             newPassword: body.password ?? body.newPassword!,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
