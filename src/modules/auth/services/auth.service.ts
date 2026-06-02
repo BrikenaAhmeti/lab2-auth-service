@@ -74,15 +74,6 @@ export class AuthService {
         return normalized;
     }
 
-    private createOneTimeToken(hoursToExpire: number) {
-        const rawToken = crypto.randomBytes(32).toString('hex');
-        const tokenHash = this.tokenHashService.hash(rawToken);
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + hoursToExpire);
-
-        return { rawToken, tokenHash, expiresAt };
-    }
-
     private createEmailVerificationCode(minutesToExpire: number) {
         const rawCode = crypto.randomInt(100000, 1000000).toString();
         const expiresAt = new Date();
@@ -208,28 +199,23 @@ export class AuthService {
         };
     }
 
-    private async sendPasswordResetEmail(email: string, token: string) {
-        const resetUrl = this.buildTokenUrl(env.passwordResetUrl, token);
+    private async sendPasswordResetEmail(email: string, code: string) {
         await this.emailService.send({
             to: email,
-            subject: 'Reset your MedSphere password',
+            subject: 'Your MedSphere reset code',
             text: [
-                `Your reset code is: ${token}`,
+                'Your password reset code is:',
                 '',
-                'Enter this code in the MedSphere mobile app to reset your password.',
+                code,
                 '',
-                'Optional link:',
-                resetUrl,
+                'This code expires in 15 minutes.',
+                'If you did not request this, you can ignore this email.',
             ].join('\n'),
             html: [
-                '<p>Reset your MedSphere password.</p>',
-                '<p>Your reset code is:</p>',
-                `<p style="font-size:20px;font-weight:700;letter-spacing:1px;">${token}</p>`,
-                '<p>Enter this code in the MedSphere mobile app to reset your password.</p>',
-                '<p>Optional link:</p>',
-                `<p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">Reset password</a></p>`,
-                '<p>If the button does not open, copy this link:</p>',
-                `<p><a href="${resetUrl}">${resetUrl}</a></p>`,
+                '<p>Your password reset code is:</p>',
+                `<p style="font-size:24px;font-weight:700;letter-spacing:2px;">${code}</p>`,
+                '<p>This code expires in 15 minutes.</p>',
+                '<p>If you did not request this, you can ignore this email.</p>',
             ].join(''),
         });
     }
@@ -732,13 +718,14 @@ export class AuthService {
 
         await this.authRepository.invalidatePasswordResetTokens(user.id);
 
-        const reset = this.createOneTimeToken(1);
+        const reset = this.createEmailVerificationCode(15);
+        const tokenHash = this.tokenHashService.hash(reset.rawCode);
         await this.authRepository.createPasswordResetToken({
             userId: user.id,
-            tokenHash: reset.tokenHash,
+            tokenHash,
             expiresAt: reset.expiresAt,
         });
-        await this.sendPasswordResetEmail(user.email, reset.rawToken);
+        await this.sendPasswordResetEmail(user.email, reset.rawCode);
 
         await this.auditLogService.log({
             userId: user.id,

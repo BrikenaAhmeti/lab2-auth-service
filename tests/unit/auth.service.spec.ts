@@ -463,15 +463,23 @@ describe('AuthService', () => {
             email: 'user@demo.local',
         });
         expect(requestResult.success).toBe(true);
+        const resetEmail = m.emailService.send.mock.calls[0][0];
         expect(m.emailService.send).toHaveBeenCalledWith(
             expect.objectContaining({
-                text: expect.stringContaining('Your reset code is:'),
-                html: expect.stringContaining('Your reset code is:'),
+                subject: 'Your MedSphere reset code',
+                text: expect.stringContaining('Your password reset code is:'),
+                html: expect.stringContaining('Your password reset code is:'),
             }),
         );
-        expect(m.emailService.send).toHaveBeenCalledWith(
+        expect(resetEmail.text).toMatch(/\b\d{6}\b/);
+        expect(resetEmail.html).toMatch(/\b\d{6}\b/);
+        expect(resetEmail.text).not.toContain('medspheremobile://reset-password');
+        expect(resetEmail.html).not.toContain('medspheremobile://reset-password');
+        expect(m.tokenHashService.hash).toHaveBeenCalledWith(expect.stringMatching(/^\d{6}$/));
+        expect(m.authRepository.createPasswordResetToken).toHaveBeenCalledWith(
             expect.objectContaining({
-                html: expect.stringContaining('medspheremobile://reset-password?token='),
+                tokenHash: 'reset-hash',
+                expiresAt: expect.any(Date),
             }),
         );
 
