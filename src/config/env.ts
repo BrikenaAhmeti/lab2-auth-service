@@ -36,7 +36,7 @@ export const env = {
     emailVerificationUrl:
         process.env.EMAIL_VERIFICATION_URL || `${appBaseUrl}/api/auth/verify-email`,
     passwordResetUrl: process.env.PASSWORD_RESET_URL || 'medspheremobile://reset-password',
-    emailFrom: process.env.EMAIL_FROM || process.env.SMTP_USER || 'noreply@medsphere.local',
+    emailFrom: process.env.EMAIL_FROM || process.env.SMTP_USER || 'MedSphere <medsphere@noreply.com>',
     coreServiceUrl: process.env.CORE_SERVICE_URL || '',
     internalApiKey: process.env.INTERNAL_API_KEY || '',
     resendApiKey: process.env.RESEND_API_KEY || '',
