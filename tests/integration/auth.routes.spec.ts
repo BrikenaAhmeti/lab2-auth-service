@@ -230,6 +230,66 @@ describe('Auth routes', () => {
         });
     });
 
+    it('lists session logs with actor details and filters', async () => {
+        const { JwtService } = await import('../../src/shared/services/jwt.service');
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+
+        jest
+            .spyOn(JwtService.prototype, 'verifyAccessToken')
+            .mockReturnValue({
+                sub: 'admin-1',
+                email: 'admin@medsphere.local',
+                roles: ['Super Admin'],
+                permissions: ['users:read:all'],
+            });
+
+        const listSpy = jest
+            .spyOn(AuthService.prototype, 'getSessionLogs')
+            .mockResolvedValue({
+                items: [
+                    {
+                        id: 'audit-1',
+                        userId: 'admin-1',
+                        action: 'session.revoked.admin',
+                        entity: 'refresh_token',
+                        entityId: 'session-1',
+                        oldValue: null,
+                        newValue: null,
+                        ipAddress: '127.0.0.1',
+                        userAgent: 'jest',
+                        createdAt: new Date('2026-06-02T10:00:00.000Z'),
+                        actor: {
+                            id: 'admin-1',
+                            email: 'admin@medsphere.local',
+                            username: 'admin',
+                            firstName: 'System',
+                            lastName: 'Admin',
+                        },
+                    },
+                ],
+                meta: { page: 1, limit: 25, total: 1, totalPages: 1 },
+            });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const response = await request(app)
+            .get('/api/auth/session-logs?action=session.revoked.admin&userSearch=admin&changed=session')
+            .set('Authorization', 'Bearer token');
+
+        expect(response.status).toBe(200);
+        expect(response.body.items[0].actor.email).toBe('admin@medsphere.local');
+        expect(listSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                viewerUserId: 'admin-1',
+                roles: ['Super Admin'],
+                action: 'session.revoked.admin',
+                userSearch: 'admin',
+                changed: 'session',
+            }),
+        );
+    });
+
     it('serves the swagger openapi document', async () => {
         const { createApp } = await import('../../src/app');
         const app = createApp();

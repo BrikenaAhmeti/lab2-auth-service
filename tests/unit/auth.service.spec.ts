@@ -26,6 +26,8 @@ function createMocks() {
         revokeAllRefreshTokensByUser: jest.fn(),
         touchRefreshToken: jest.fn(),
         listActiveSessions: jest.fn(),
+        listAllActiveSessions: jest.fn(),
+        findActiveSessionById: jest.fn(),
         createEmailVerificationToken: jest.fn(),
         invalidateEmailVerificationTokens: jest.fn(),
         findValidEmailVerificationToken: jest.fn(),
@@ -60,6 +62,7 @@ function createMocks() {
 
     const auditLogService = {
         log: jest.fn(),
+        listSessionLogs: jest.fn(),
     };
 
     const emailService: jest.Mocked<EmailService> = {
@@ -81,6 +84,23 @@ describe('AuthService', () => {
     beforeEach(() => {
         jest.clearAllMocks();
     });
+
+    const activeSession = {
+        id: 'session-1',
+        userId: 'u1',
+        deviceInfo: 'Mozilla/5.0 Chrome/148.0.0.0',
+        ipAddress: '127.0.0.1',
+        createdAt: new Date('2026-06-02T10:00:00.000Z'),
+        lastUsedAt: new Date('2026-06-02T10:10:00.000Z'),
+        expiresAt: new Date('2026-06-09T10:00:00.000Z'),
+        user: {
+            id: 'u1',
+            email: 'admin@medsphere.local',
+            username: 'admin',
+            firstName: 'Admin',
+            lastName: 'User',
+        },
+    };
 
     it('logs in active user and returns tokens', async () => {
         const m = createMocks();
@@ -517,6 +537,71 @@ describe('AuthService', () => {
         );
     });
 
+    it('returns all active sessions for admins and own sessions for regular users', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        m.authRepository.listAllActiveSessions.mockResolvedValue([activeSession]);
+        m.authRepository.listActiveSessions.mockResolvedValue([activeSession]);
+
+        await expect(
+            service.getSessions({ userId: 'admin-1', roles: ['Super Admin'] }),
+        ).resolves.toEqual([activeSession]);
+        expect(m.authRepository.listAllActiveSessions).toHaveBeenCalled();
+
+        await expect(
+            service.getSessions({ userId: 'u1', roles: ['Patient'] }),
+        ).resolves.toEqual([activeSession]);
+        expect(m.authRepository.listActiveSessions).toHaveBeenCalledWith('u1');
+    });
+
+    it('lists session logs with actor scope and filters', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+        const result = {
+            items: [],
+            meta: { page: 1, limit: 25, total: 0, totalPages: 0 },
+        };
+
+        m.auditLogService.listSessionLogs.mockResolvedValue(result);
+
+        await expect(
+            service.getSessionLogs({
+                viewerUserId: 'u1',
+                roles: ['Patient'],
+                page: 1,
+                limit: 25,
+                action: 'login.success',
+                changed: 'chrome',
+            }),
+        ).resolves.toBe(result);
+
+        expect(m.auditLogService.listSessionLogs).toHaveBeenCalledWith(
+            expect.objectContaining({
+                viewerUserId: 'u1',
+                canViewAll: false,
+                action: 'login.success',
+                changed: 'chrome',
+            }),
+        );
+    });
+
     it('revokes own session and throws when session does not exist', async () => {
         const m = createMocks();
         const service = new AuthService(
@@ -529,7 +614,7 @@ describe('AuthService', () => {
             m.emailService,
         );
 
-        m.authRepository.revokeRefreshTokenById.mockResolvedValue(false);
+        m.authRepository.findActiveSessionById.mockResolvedValue(null);
 
         await expect(
             service.revokeSession({
@@ -537,6 +622,48 @@ describe('AuthService', () => {
                 sessionId: 'missing-session',
             }),
         ).rejects.toBeInstanceOf(AppError);
+    });
+
+    it('logs session revoke details with the affected user and device', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        m.authRepository.findActiveSessionById.mockResolvedValue(activeSession);
+        m.authRepository.revokeRefreshTokenByIdAnyUser.mockResolvedValue(true);
+
+        const result = await service.revokeSessionAsAdmin({
+            actorUserId: 'admin-1',
+            sessionId: 'session-1',
+            ipAddress: '127.0.0.1',
+        });
+
+        expect(result.success).toBe(true);
+        expect(m.auditLogService.log).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'admin-1',
+                action: 'session.revoked.admin',
+                entityId: 'session-1',
+                oldValue: expect.objectContaining({
+                    user: expect.objectContaining({
+                        email: 'admin@medsphere.local',
+                        username: 'admin',
+                    }),
+                    deviceInfo: 'Mozilla/5.0 Chrome/148.0.0.0',
+                }),
+                newValue: expect.objectContaining({
+                    targetUserId: 'u1',
+                    revokedByUserId: 'admin-1',
+                }),
+            }),
+        );
     });
 
     it('changes password for authenticated user and revokes sessions', async () => {

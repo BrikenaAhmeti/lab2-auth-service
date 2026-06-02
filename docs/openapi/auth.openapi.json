@@ -420,6 +420,11 @@
             "format": "uuid",
             "example": "d24f9ffc-b7aa-4c50-8ac3-a9a7a6c8aa09"
           },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "7e32f32d-a81c-4024-bdb9-efaf7d72ec65"
+          },
           "deviceInfo": {
             "type": "string",
             "nullable": true,
@@ -444,6 +449,142 @@
             "type": "string",
             "format": "date-time",
             "example": "2026-03-20T10:00:00.000Z"
+          },
+          "user": {
+            "$ref": "#/components/schemas/SessionUser"
+          }
+        }
+      },
+      "SessionUser": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "firstName",
+          "lastName"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "admin@medsphere.local"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true,
+            "example": "admin"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "System"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Admin"
+          }
+        }
+      },
+      "SessionAuditLog": {
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "entity",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "example": "session.revoked.admin"
+          },
+          "entity": {
+            "type": "string",
+            "example": "refresh_token"
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "oldValue": {
+            "nullable": true
+          },
+          "newValue": {
+            "nullable": true
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SessionUser"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "SessionAuditLogListResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "meta"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionAuditLog"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "page",
+              "limit",
+              "total",
+              "totalPages"
+            ],
+            "properties": {
+              "page": {
+                "type": "integer",
+                "example": 1
+              },
+              "limit": {
+                "type": "integer",
+                "example": 25
+              },
+              "total": {
+                "type": "integer",
+                "example": 12
+              },
+              "totalPages": {
+                "type": "integer",
+                "example": 1
+              }
+            }
           }
         }
       },
@@ -1433,7 +1574,7 @@
         "tags": [
           "Sessions"
         ],
-        "summary": "List active sessions for the authenticated user",
+        "summary": "List active sessions visible to the authenticated user",
         "operationId": "listMySessions",
         "security": [
           {
@@ -1450,6 +1591,99 @@
                   "items": {
                     "$ref": "#/components/schemas/Session"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/auth/session-logs": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "List session and auth activity logs",
+        "operationId": "listSessionLogs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "example": "session.revoked.admin"
+          },
+          {
+            "name": "userSearch",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by actor name, username, or email."
+          },
+          {
+            "name": "changed",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter against action, entity, IP, device, and audit value details."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session activity logs with actor details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionAuditLogListResponse"
                 }
               }
             }

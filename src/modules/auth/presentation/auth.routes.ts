@@ -104,6 +104,14 @@ authRoutes.get('/sessions', authMiddleware, requirePermission('users:read', 'own
   }
 });
 
+authRoutes.get('/session-logs', authMiddleware, requirePermission('users:read', 'own'), async (req, res, next) => {
+  try {
+    await controller.sessionLogs(req as any, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
 authRoutes.post(
   '/change-password',
   authMiddleware,
