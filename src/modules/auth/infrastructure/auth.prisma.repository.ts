@@ -5,6 +5,7 @@ import {
     CreateAdminUserData,
     AuthUserView,
     CreateRefreshTokenData,
+    ActiveSessionView,
 } from '../domain/auth.repository';
 
 function mapAuthUser(user: any): AuthUserView {
@@ -171,7 +172,28 @@ export class AuthPrismaRepository implements AuthRepository {
         });
     }
 
-    async listActiveSessions(userId: string): Promise<any[]> {
+    private activeSessionSelect() {
+        return {
+            id: true,
+            userId: true,
+            deviceInfo: true,
+            ipAddress: true,
+            expiresAt: true,
+            lastUsedAt: true,
+            createdAt: true,
+            user: {
+                select: {
+                    id: true,
+                    email: true,
+                    username: true,
+                    firstName: true,
+                    lastName: true,
+                },
+            },
+        } as const;
+    }
+
+    async listActiveSessions(userId: string): Promise<ActiveSessionView[]> {
         return prisma.refreshToken.findMany({
             where: {
                 userId,
@@ -181,14 +203,35 @@ export class AuthPrismaRepository implements AuthRepository {
             orderBy: {
                 createdAt: 'desc',
             },
-            select: {
-                id: true,
-                deviceInfo: true,
-                ipAddress: true,
-                expiresAt: true,
-                lastUsedAt: true,
-                createdAt: true,
+            select: this.activeSessionSelect(),
+        });
+    }
+
+    async listAllActiveSessions(): Promise<ActiveSessionView[]> {
+        return prisma.refreshToken.findMany({
+            where: {
+                revokedAt: null,
+                expiresAt: { gt: new Date() },
             },
+            orderBy: {
+                createdAt: 'desc',
+            },
+            select: this.activeSessionSelect(),
+        });
+    }
+
+    async findActiveSessionById(
+        id: string,
+        userId?: string,
+    ): Promise<ActiveSessionView | null> {
+        return prisma.refreshToken.findFirst({
+            where: {
+                id,
+                ...(userId ? { userId } : {}),
+                revokedAt: null,
+                expiresAt: { gt: new Date() },
+            },
+            select: this.activeSessionSelect(),
         });
     }
 

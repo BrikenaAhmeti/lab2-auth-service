@@ -106,6 +106,24 @@ const contactAcknowledgementSchema = z.object({
     subject: z.string().trim().min(1).max(200),
 });
 
+const sessionLogsQuerySchema = z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(25),
+    action: z.string().trim().optional(),
+    userId: z.string().trim().optional(),
+    userSearch: z.string().trim().optional(),
+    changed: z.string().trim().optional(),
+    from: z.string().trim().optional(),
+    to: z.string().trim().optional(),
+});
+
+function parseQueryDate(value?: string) {
+    if (!value) return undefined;
+
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
 export class AuthController {
     private readonly service = new AuthService(
         new UserPrismaRepository(),
@@ -253,7 +271,28 @@ export class AuthController {
     }
 
     async sessions(req: Request, res: Response) {
-        const result = await this.service.getSessions(req.user!.id);
+        const result = await this.service.getSessions({
+            userId: req.user!.id,
+            roles: req.user!.roles,
+        });
+        return res.status(200).json(result);
+    }
+
+    async sessionLogs(req: Request, res: Response) {
+        const query = sessionLogsQuerySchema.parse(req.query);
+        const result = await this.service.getSessionLogs({
+            viewerUserId: req.user!.id,
+            roles: req.user!.roles,
+            page: query.page,
+            limit: query.limit,
+            action: query.action,
+            userId: query.userId,
+            userSearch: query.userSearch,
+            changed: query.changed,
+            from: parseQueryDate(query.from),
+            to: parseQueryDate(query.to),
+        });
+
         return res.status(200).json(result);
     }
 

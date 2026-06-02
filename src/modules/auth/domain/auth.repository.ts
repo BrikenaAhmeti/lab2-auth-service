@@ -38,6 +38,25 @@ export interface AuthUserView {
     permissions: string[];
 }
 
+export interface SessionUserView {
+    id: string;
+    email: string;
+    username?: string | null;
+    firstName: string;
+    lastName: string;
+}
+
+export interface ActiveSessionView {
+    id: string;
+    userId: string;
+    deviceInfo?: string | null;
+    ipAddress?: string | null;
+    expiresAt: Date;
+    lastUsedAt: Date;
+    createdAt: Date;
+    user: SessionUserView;
+}
+
 export interface AuthRepository {
     getUserAuthByIdentifier(identifier: string): Promise<AuthUserView | null>;
     getUserAuthById(id: string): Promise<AuthUserView | null>;
@@ -48,7 +67,9 @@ export interface AuthRepository {
     revokeRefreshTokenByIdAnyUser(id: string): Promise<boolean>;
     revokeAllRefreshTokensByUser(userId: string): Promise<number>;
     touchRefreshToken(tokenHash: string): Promise<void>;
-    listActiveSessions(userId: string): Promise<any[]>;
+    listActiveSessions(userId: string): Promise<ActiveSessionView[]>;
+    listAllActiveSessions(): Promise<ActiveSessionView[]>;
+    findActiveSessionById(id: string, userId?: string): Promise<ActiveSessionView | null>;
     createEmailVerificationToken(data: CreateOneTimeTokenData): Promise<void>;
     invalidateEmailVerificationTokens(userId: string): Promise<void>;
     findValidEmailVerificationToken(tokenHash: string): Promise<any | null>;

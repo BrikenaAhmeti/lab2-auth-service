@@ -7,7 +7,7 @@ import { TokenHashService } from '../../../shared/services/token-hash.service';
 import { EmailService } from '../../../shared/services/email.service';
 import { AuditLogService } from '../../audit-logs/services/audit-log.service';
 import { UserRepository } from '../../users/domain/user.repository';
-import { AuthRepository } from '../domain/auth.repository';
+import { ActiveSessionView, AuthRepository } from '../domain/auth.repository';
 import { PatientProfileLinker } from '../domain/patient-profile-linker';
 
 export class AuthService {
@@ -50,6 +50,29 @@ export class AuthService {
         }
 
         return normalized;
+    }
+
+    private canViewAllSessions(roles: string[]) {
+        return roles.includes('Admin') || roles.includes('Super Admin');
+    }
+
+    private sessionAuditValue(session: ActiveSessionView) {
+        return {
+            sessionId: session.id,
+            userId: session.userId,
+            deviceInfo: session.deviceInfo ?? null,
+            ipAddress: session.ipAddress ?? null,
+            createdAt: session.createdAt.toISOString(),
+            lastUsedAt: session.lastUsedAt.toISOString(),
+            expiresAt: session.expiresAt.toISOString(),
+            user: {
+                id: session.user.id,
+                email: session.user.email,
+                username: session.user.username ?? null,
+                firstName: session.user.firstName,
+                lastName: session.user.lastName,
+            },
+        };
     }
 
     private normalizePersonalNumber(personalNumber?: string | null) {
@@ -447,6 +470,16 @@ export class AuthService {
         }
 
         if (!user.isActive) {
+            await this.auditLogService.log({
+                userId: user.id,
+                action: 'login.failed',
+                entity: 'auth',
+                entityId: user.id,
+                newValue: { email: user.email, reason: 'inactive_account' },
+                ipAddress: input.ipAddress,
+                userAgent: input.userAgent,
+            });
+
             throw new AppError('User account is inactive. Please verify your email.', 403);
         }
 
@@ -641,8 +674,38 @@ export class AuthService {
         };
     }
 
-    async getSessions(userId: string) {
-        return this.authRepository.listActiveSessions(userId);
+    async getSessions(input: { userId: string; roles: string[] }) {
+        if (this.canViewAllSessions(input.roles)) {
+            return this.authRepository.listAllActiveSessions();
+        }
+
+        return this.authRepository.listActiveSessions(input.userId);
+    }
+
+    async getSessionLogs(input: {
+        viewerUserId: string;
+        roles: string[];
+        page: number;
+        limit: number;
+        action?: string;
+        userId?: string;
+        userSearch?: string;
+        changed?: string;
+        from?: Date;
+        to?: Date;
+    }) {
+        return this.auditLogService.listSessionLogs({
+            viewerUserId: input.viewerUserId,
+            canViewAll: this.canViewAllSessions(input.roles),
+            page: input.page,
+            limit: input.limit,
+            action: input.action,
+            userId: input.userId,
+            userSearch: input.userSearch,
+            changed: input.changed,
+            from: input.from,
+            to: input.to,
+        });
     }
 
     async revokeSession(input: {
@@ -651,20 +714,27 @@ export class AuthService {
         ipAddress?: string;
         userAgent?: string;
     }) {
-        const revoked = await this.authRepository.revokeRefreshTokenById(
+        const session = await this.authRepository.findActiveSessionById(
             input.sessionId,
             input.userId,
         );
 
-        if (!revoked) {
+        if (!session) {
             throw new AppError('Session not found', 404);
         }
+
+        await this.authRepository.revokeRefreshTokenById(input.sessionId, input.userId);
 
         await this.auditLogService.log({
             userId: input.userId,
             action: 'session.revoked',
             entity: 'refresh_token',
             entityId: input.sessionId,
+            oldValue: this.sessionAuditValue(session),
+            newValue: {
+                status: 'revoked',
+                revokedByUserId: input.userId,
+            },
             ipAddress: input.ipAddress,
             userAgent: input.userAgent,
         });
@@ -678,19 +748,27 @@ export class AuthService {
         ipAddress?: string;
         userAgent?: string;
     }) {
-        const revoked = await this.authRepository.revokeRefreshTokenByIdAnyUser(
+        const session = await this.authRepository.findActiveSessionById(
             input.sessionId,
         );
 
-        if (!revoked) {
+        if (!session) {
             throw new AppError('Session not found', 404);
         }
+
+        await this.authRepository.revokeRefreshTokenByIdAnyUser(input.sessionId);
 
         await this.auditLogService.log({
             userId: input.actorUserId,
             action: 'session.revoked.admin',
             entity: 'refresh_token',
             entityId: input.sessionId,
+            oldValue: this.sessionAuditValue(session),
+            newValue: {
+                status: 'revoked',
+                revokedByUserId: input.actorUserId,
+                targetUserId: session.userId,
+            },
             ipAddress: input.ipAddress,
             userAgent: input.userAgent,
         });
