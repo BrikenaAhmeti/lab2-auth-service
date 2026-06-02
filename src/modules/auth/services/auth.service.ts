@@ -8,6 +8,7 @@ import { EmailService } from '../../../shared/services/email.service';
 import { AuditLogService } from '../../audit-logs/services/audit-log.service';
 import { UserRepository } from '../../users/domain/user.repository';
 import { AuthRepository } from '../domain/auth.repository';
+import { PatientProfileLinker } from '../domain/patient-profile-linker';
 
 export class AuthService {
     constructor(
@@ -18,6 +19,7 @@ export class AuthService {
         private readonly tokenHashService: TokenHashService,
         private readonly auditLogService: AuditLogService,
         private readonly emailService: EmailService,
+        private readonly patientProfileLinker?: PatientProfileLinker,
     ) { }
 
     private assertPasswordComplexity(password: string) {
@@ -217,6 +219,55 @@ export class AuthService {
                 '<p>This code expires in 15 minutes.</p>',
                 '<p>If you did not request this, you can ignore this email.</p>',
             ].join(''),
+        });
+    }
+
+    async sendContactAcknowledgementEmail(input: {
+        name: string;
+        email: string;
+        subject: string;
+    }) {
+        const name = input.name.trim();
+        const email = input.email.trim().toLowerCase();
+        const subject = input.subject.trim();
+
+        await this.emailService.send({
+            to: email,
+            subject: 'We received your MedSphere message',
+            text: [
+                `Hello ${name || 'there'},`,
+                `We received your message${subject ? ` about "${subject}"` : ''}.`,
+                'Our team will review it and will be in touch soon.',
+                'Thank you for contacting MedSphere.',
+            ].join('\n\n'),
+            html: [
+                `<p>Hello ${this.escapeHtml(name || 'there')},</p>`,
+                `<p>We received your message${subject ? ` about <strong>${this.escapeHtml(subject)}</strong>` : ''}.</p>`,
+                '<p>Our team will review it and will be in touch soon.</p>',
+                '<p>Thank you for contacting MedSphere.</p>',
+            ].join(''),
+        });
+
+        return {
+            success: true,
+            message: 'Contact acknowledgement email sent.',
+        };
+    }
+
+    private async linkPatientProfileForVerifiedUser(userId: string) {
+        if (!this.patientProfileLinker) {
+            return;
+        }
+
+        const user = await this.userRepository.findById(userId);
+
+        if (!user?.personalNumber) {
+            return;
+        }
+
+        await this.patientProfileLinker.linkByPersonalNumber({
+            userId: user.id,
+            personalNumber: user.personalNumber,
         });
     }
 
@@ -690,6 +741,7 @@ export class AuthService {
             throw new AppError('Invalid or expired verification code', 400);
         }
 
+        await this.linkPatientProfileForVerifiedUser(verificationToken.userId);
         await this.authRepository.markEmailVerificationTokenUsed(verificationToken.id);
         await this.authRepository.markUserEmailVerified(verificationToken.userId);
 

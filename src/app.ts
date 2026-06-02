@@ -5,7 +5,7 @@ import morgan from 'morgan';
 import { errorHandler } from './shared/middleware/error-handler';
 import { notFoundHandler } from './shared/middleware/not-found';
 import { departmentRoutes } from './modules/departments/presentation/department.routes';
-import { authRoutes } from './modules/auth/presentation/auth.routes';
+import { authRoutes, internalAuthRoutes } from './modules/auth/presentation/auth.routes';
 import { userRoutes } from './modules/users/presentation/user.routes';
 import { swaggerRoutes } from './docs/swagger.routes';
 
@@ -30,6 +30,7 @@ export function createApp() {
     app.use('/api/docs', swaggerRoutes);
     app.use('/departments', departmentRoutes);
     app.use('/api/auth', authRoutes);
+    app.use('/internal/auth', internalAuthRoutes);
     app.use('/api/users', userRoutes);
 
     app.use(notFoundHandler);

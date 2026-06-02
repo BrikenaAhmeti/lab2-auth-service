@@ -56,6 +56,7 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-with-auth-service-refresh-secret}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3005}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@medsphere.local}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-replace-with-shared-internal-service-key}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
