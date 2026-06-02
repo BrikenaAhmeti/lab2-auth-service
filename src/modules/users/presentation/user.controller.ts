@@ -14,6 +14,10 @@ const updateMeSchema = z.object({
     avatarFileId: z.string().nullable().optional(),
 });
 
+const internalProfilesSchema = z.object({
+    userIds: z.array(z.string().uuid('Invalid user id')).max(100),
+});
+
 export class UserController {
     private readonly service = new UserService(
         new UserPrismaRepository(),
@@ -28,6 +32,13 @@ export class UserController {
     async getDoctors(req: Request, res: Response) {
         const result = await this.service.getDoctors();
         return res.status(200).json(result);
+    }
+
+    async internalProfiles(req: Request, res: Response) {
+        const body = internalProfilesSchema.parse(req.body);
+        const result = await this.service.getInternalProfiles(body.userIds);
+
+        return res.status(200).json({ data: result });
     }
 
     async updateMe(req: Request, res: Response) {

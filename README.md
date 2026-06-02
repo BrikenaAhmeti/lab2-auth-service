@@ -167,11 +167,12 @@ npm run docker:up
 
 Docker runs database migrations and seeds the default users before starting the API.
 
-Default admin login:
+Default demo logins:
 
-- Email: `admin@medsphere.local`
-- Username: `admin`
-- Password: `Admin1234!Pass`
+- Admin email: `admin@medsphere.local`
+- Patient email: `patient@medsphere.local`
+- Doctor email: `doctor@medsphere.local`
+- Shared password: `Medsphere@123`
 
 ---
 
@@ -244,11 +245,12 @@ AI/OpenAI note:
 
 - This auth service does not require OpenAI credentials or an OpenAI SDK. Per the MedSphere plan, OpenAI-backed transcription, summarization, lab interpretation, and reservation-agent features belong in a separate AI service.
 
-Default seeded admin for frontend testing:
+Default seeded logins for frontend testing:
 
-- Email: `admin@medsphere.local`
-- Username: `admin`
-- Password: `Admin1234!Pass`
+- Admin email: `admin@medsphere.local`
+- Patient email: `patient@medsphere.local`
+- Doctor email: `doctor@medsphere.local`
+- Shared password: `Medsphere@123`
 
 ---
 

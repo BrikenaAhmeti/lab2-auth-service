@@ -5,6 +5,7 @@ function createMocks() {
     const userRepository: jest.Mocked<UserRepository> = {
         create: jest.fn(),
         findById: jest.fn(),
+        findByIds: jest.fn(),
         findByEmail: jest.fn(),
         findByUsername: jest.fn(),
         findByPersonalNumber: jest.fn(),
@@ -81,5 +82,61 @@ describe('UserService', () => {
         });
         expect(result).not.toHaveProperty('passwordHash');
         expect(result).not.toHaveProperty('personalNumber');
+    });
+
+    it('returns internal profiles in requested order without sensitive fields', async () => {
+        const m = createMocks();
+        const service = new UserService(m.userRepository, m.auditLogService as any);
+
+        m.userRepository.findByIds.mockResolvedValue([
+            {
+                id: 'u2',
+                firstName: 'Anika',
+                lastName: 'Rao',
+                email: 'doctor@medsphere.local',
+                username: 'doctor',
+                phone: null,
+                avatarFileId: null,
+                passwordHash: 'hidden',
+                personalNumber: 'hidden',
+                userRoles: [{ role: { name: 'Doctor' } }],
+            },
+            {
+                id: 'u1',
+                firstName: 'Arta',
+                lastName: 'Patient',
+                email: 'patient@medsphere.local',
+                username: 'patient',
+                phone: null,
+                avatarFileId: null,
+                passwordHash: 'hidden',
+                personalNumber: 'hidden',
+                userRoles: [{ role: { name: 'Patient' } }],
+            },
+        ]);
+
+        const result = await service.getInternalProfiles(['u1', 'u2', 'u1']);
+
+        expect(m.userRepository.findByIds).toHaveBeenCalledWith(['u1', 'u2']);
+        expect(result).toEqual([
+            expect.objectContaining({
+                id: 'u1',
+                userId: 'u1',
+                firstName: 'Arta',
+                lastName: 'Patient',
+                role: 'patient',
+                roles: ['Patient'],
+            }),
+            expect.objectContaining({
+                id: 'u2',
+                userId: 'u2',
+                firstName: 'Anika',
+                lastName: 'Rao',
+                role: 'doctor',
+                roles: ['Doctor'],
+            }),
+        ]);
+        expect(result[0]).not.toHaveProperty('passwordHash');
+        expect(result[0]).not.toHaveProperty('personalNumber');
     });
 });

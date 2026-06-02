@@ -13,6 +13,26 @@ export class UserService {
         return publicProfile;
     }
 
+    private toInternalProfile(user: any) {
+        const roles = (user.userRoles ?? [])
+            .map((entry: any) => entry.role?.name)
+            .filter(Boolean);
+        const [primaryRole] = roles;
+
+        return {
+            id: user.id,
+            userId: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            username: user.username,
+            phone: user.phone,
+            avatarFileId: user.avatarFileId,
+            roles,
+            role: primaryRole ? primaryRole.toLowerCase().replace(/\s+/g, '_') : undefined,
+        };
+    }
+
     async getCurrentUser(userId: string) {
         const user = await this.userRepository.findById(userId);
 
@@ -25,6 +45,22 @@ export class UserService {
 
     async getDoctors() {
         return this.userRepository.findDoctors();
+    }
+
+    async getInternalProfiles(userIds: string[]) {
+        const uniqueIds = [...new Set(userIds)];
+
+        if (uniqueIds.length === 0) {
+            return [];
+        }
+
+        const users = await this.userRepository.findByIds(uniqueIds);
+        const usersById = new Map(users.map((user) => [user.id, user]));
+
+        return uniqueIds
+            .map((id) => usersById.get(id))
+            .filter(Boolean)
+            .map((user) => this.toInternalProfile(user));
     }
 
     async updateMyProfile(
