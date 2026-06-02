@@ -28,7 +28,9 @@ Thumbs.db
 .idea/
 
 # Prisma
-prisma/migrations/
+prisma/migrations/*
+!prisma/migrations/20260602113000_add_user_avatar_url/
+!prisma/migrations/20260602113000_add_user_avatar_url/migration.sql
 src/generated/
 
 # Coverage

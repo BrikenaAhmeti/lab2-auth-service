@@ -36,6 +36,7 @@ export class UserService {
             dateOfBirth?: Date | null;
             gender?: string | null;
             avatarFileId?: string | null;
+            avatarUrl?: string | null;
             ipAddress?: string;
             userAgent?: string;
         },
@@ -53,6 +54,7 @@ export class UserService {
             dateOfBirth: data.dateOfBirth,
             gender: data.gender,
             avatarFileId: data.avatarFileId,
+            avatarUrl: data.avatarUrl,
             updatedBy: userId,
         });
 
@@ -68,6 +70,7 @@ export class UserService {
                 dateOfBirth: existing.dateOfBirth,
                 gender: existing.gender,
                 avatarFileId: existing.avatarFileId,
+                avatarUrl: existing.avatarUrl,
             },
             newValue: {
                 firstName: updated.firstName,
@@ -76,6 +79,7 @@ export class UserService {
                 dateOfBirth: updated.dateOfBirth,
                 gender: updated.gender,
                 avatarFileId: updated.avatarFileId,
+                avatarUrl: updated.avatarUrl,
             },
             ipAddress: data.ipAddress,
             userAgent: data.userAgent,

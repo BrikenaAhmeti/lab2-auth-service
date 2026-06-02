@@ -56,6 +56,7 @@ export class UserPrismaRepository implements UserRepository {
                 username: true,
                 phone: true,
                 avatarFileId: true,
+                avatarUrl: true,
             },
         });
     }

@@ -8,6 +8,7 @@ export interface CreateUserData {
     dateOfBirth?: Date;
     gender?: string;
     personalNumber?: string;
+    avatarUrl?: string | null;
     isActive?: boolean;
     emailVerifiedAt?: Date | null;
     createdBy?: string;
@@ -21,6 +22,7 @@ export interface UpdateMyProfileData {
     dateOfBirth?: Date | null;
     gender?: string | null;
     avatarFileId?: string | null;
+    avatarUrl?: string | null;
     updatedBy?: string;
 }
 
