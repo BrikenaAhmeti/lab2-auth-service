@@ -123,6 +123,35 @@ describe('AuthService', () => {
         expect(m.authRepository.createRefreshToken).toHaveBeenCalled();
     });
 
+    it('sends contact acknowledgement email through the configured email service', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        const result = await service.sendContactAcknowledgementEmail({
+            name: ' Ada Lovelace ',
+            email: 'ADA@EXAMPLE.COM',
+            subject: ' Appointment question ',
+        });
+
+        expect(result.success).toBe(true);
+        expect(m.emailService.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+                to: 'ada@example.com',
+                subject: 'We received your MedSphere message',
+                text: expect.stringContaining('Appointment question'),
+                html: expect.stringContaining('Appointment question'),
+            }),
+        );
+    });
+
     it('logs in with username through the existing email field', async () => {
         const m = createMocks();
         const service = new AuthService(
@@ -395,6 +424,48 @@ describe('AuthService', () => {
 
         expect(result.success).toBe(true);
         expect(m.tokenHashService.hash).toHaveBeenCalledWith('u1:123456');
+        expect(m.authRepository.markUserEmailVerified).toHaveBeenCalledWith('u1');
+    });
+
+    it('links the patient profile by personal number during email verification', async () => {
+        const m = createMocks();
+        const patientProfileLinker = {
+            linkByPersonalNumber: jest.fn().mockResolvedValue({
+                linked: true,
+                patientId: 'patient-1',
+                userId: 'u1',
+            }),
+        };
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+            patientProfileLinker,
+        );
+
+        m.tokenHashService.hash.mockReturnValue('verify-hash');
+        m.authRepository.findValidEmailVerificationToken.mockResolvedValue({
+            id: 'evt1',
+            userId: 'u1',
+        });
+        m.userRepository.findById.mockResolvedValue({
+            id: 'u1',
+            personalNumber: '1234567890',
+        });
+        m.authRepository.markEmailVerificationTokenUsed.mockResolvedValue();
+        m.authRepository.markUserEmailVerified.mockResolvedValue();
+
+        const result = await service.verifyEmail({ token: 'raw-token' });
+
+        expect(result.success).toBe(true);
+        expect(patientProfileLinker.linkByPersonalNumber).toHaveBeenCalledWith({
+            userId: 'u1',
+            personalNumber: '1234567890',
+        });
         expect(m.authRepository.markUserEmailVerified).toHaveBeenCalledWith('u1');
     });
 

@@ -9,6 +9,7 @@ import { PasswordService } from '../../../shared/services/password.service';
 import { JwtService } from '../../../shared/services/jwt.service';
 import { TokenHashService } from '../../../shared/services/token-hash.service';
 import { createEmailService } from '../../../shared/services/email.service';
+import { CorePatientClient } from '../infrastructure/core-patient.client';
 
 const usernameSchema = z
     .string()
@@ -88,6 +89,12 @@ const createAdminUserSchema = z.object({
     personalNumber: z.string().trim().min(1).max(50).optional(),
 });
 
+const contactAcknowledgementSchema = z.object({
+    name: z.string().trim().min(1).max(200),
+    email: z.email(),
+    subject: z.string().trim().min(1).max(200),
+});
+
 export class AuthController {
     private readonly service = new AuthService(
         new UserPrismaRepository(),
@@ -97,6 +104,7 @@ export class AuthController {
         new TokenHashService(),
         new AuditLogService(new AuditLogPrismaRepository()),
         createEmailService(),
+        new CorePatientClient(),
     );
 
     async register(req: Request, res: Response) {
@@ -180,6 +188,13 @@ export class AuthController {
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
         });
+
+        return res.status(200).json(result);
+    }
+
+    async sendContactAcknowledgement(req: Request, res: Response) {
+        const body = contactAcknowledgementSchema.parse(req.body);
+        const result = await this.service.sendContactAcknowledgementEmail(body);
 
         return res.status(200).json(result);
     }

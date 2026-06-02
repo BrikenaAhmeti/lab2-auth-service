@@ -188,6 +188,48 @@ describe('Auth routes', () => {
         );
     });
 
+    it('sends contact acknowledgement from the internal route only with the shared key', async () => {
+        process.env.INTERNAL_API_KEY = 'auth-internal-test-key';
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+
+        const sendSpy = jest
+            .spyOn(AuthService.prototype, 'sendContactAcknowledgementEmail')
+            .mockResolvedValue({
+                success: true,
+                message: 'Contact acknowledgement email sent.',
+            });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const rejected = await request(app)
+            .post('/internal/auth/contact-acknowledgement')
+            .send({
+                name: 'Ada Lovelace',
+                email: 'ada@example.com',
+                subject: 'Appointment question',
+            });
+
+        expect(rejected.status).toBe(401);
+
+        const response = await request(app)
+            .post('/internal/auth/contact-acknowledgement')
+            .set('x-internal-api-key', 'auth-internal-test-key')
+            .send({
+                name: 'Ada Lovelace',
+                email: 'ada@example.com',
+                subject: 'Appointment question',
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+        expect(sendSpy).toHaveBeenCalledWith({
+            name: 'Ada Lovelace',
+            email: 'ada@example.com',
+            subject: 'Appointment question',
+        });
+    });
+
     it('serves the swagger openapi document', async () => {
         const { createApp } = await import('../../src/app');
         const app = createApp();

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from './auth.controller';
 import { authMiddleware } from '../../../shared/middleware/auth.middleware';
+import { requireInternalApiKey } from '../../../shared/middleware/internal-api-key';
 import { createRateLimiter } from '../../../shared/middleware/rate-limit';
 import { requirePermission } from '../../../shared/middleware/require-permission';
 import { requireRole } from '../../../shared/middleware/require-role';
@@ -8,6 +9,7 @@ import { requireRole } from '../../../shared/middleware/require-role';
 const controller = new AuthController();
 
 export const authRoutes = Router();
+export const internalAuthRoutes = Router();
 const authRateLimit = createRateLimiter({
   windowMs: 60_000,
   maxRequests: 10,
@@ -150,3 +152,11 @@ authRoutes.post(
     }
   },
 );
+
+internalAuthRoutes.post('/contact-acknowledgement', requireInternalApiKey, async (req, res, next) => {
+  try {
+    await controller.sendContactAcknowledgement(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
