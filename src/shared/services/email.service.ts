@@ -80,5 +80,11 @@ export function createEmailService(): EmailService {
         return new ResendEmailService();
     }
 
+    if (env.nodeEnv === 'production') {
+        throw new Error(
+            'Email provider is not configured. Set SMTP_HOST/SMTP_USER/SMTP_PASS or RESEND_API_KEY.',
+        );
+    }
+
     return new ConsoleEmailService();
 }
