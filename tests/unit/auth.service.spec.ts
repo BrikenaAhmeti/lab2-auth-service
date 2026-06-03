@@ -3,6 +3,7 @@ import { AuthService } from '../../src/modules/auth/services/auth.service';
 import { AuthRepository } from '../../src/modules/auth/domain/auth.repository';
 import { UserRepository } from '../../src/modules/users/domain/user.repository';
 import { EmailService } from '../../src/shared/services/email.service';
+import { env } from '../../src/config/env';
 
 function createMocks() {
     const userRepository: jest.Mocked<UserRepository> = {
@@ -82,8 +83,11 @@ function createMocks() {
 }
 
 describe('AuthService', () => {
+    const defaultEmailVerificationUrl = env.emailVerificationUrl;
+
     beforeEach(() => {
         jest.clearAllMocks();
+        env.emailVerificationUrl = defaultEmailVerificationUrl;
     });
 
     const activeSession = {
@@ -307,6 +311,7 @@ describe('AuthService', () => {
     });
 
     it('registers patient and creates email verification token', async () => {
+        env.emailVerificationUrl = 'http://localhost:3001/verify-email';
         const m = createMocks();
         const service = new AuthService(
             m.userRepository,
@@ -351,14 +356,17 @@ describe('AuthService', () => {
         expect(m.userRepository.create).toHaveBeenCalledWith(
             expect.objectContaining({ personalNumber: '1234567890' }),
         );
-        expect(m.tokenHashService.hash).toHaveBeenCalledWith(expect.stringMatching(/^u100:\d{6}$/));
+        expect(m.tokenHashService.hash).toHaveBeenCalledWith(expect.stringMatching(/^[a-f0-9]{64}$/));
         expect(m.authRepository.createEmailVerificationToken).toHaveBeenCalledWith(
             expect.objectContaining({ tokenHash: 'verify-hash' }),
         );
         expect(m.authRepository.assignRolesToUser).toHaveBeenCalledWith('u100', ['role-patient']);
         expect(m.emailService.send).toHaveBeenCalled();
         expect(m.emailService.send.mock.calls[0][0].text).toContain(
-            'Your verification code is:',
+            'Verify your account by opening this link:',
+        );
+        expect(m.emailService.send.mock.calls[0][0].text).toContain(
+            'http://localhost:3001/verify-email?token=',
         );
     });
 

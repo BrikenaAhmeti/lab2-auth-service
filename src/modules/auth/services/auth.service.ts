@@ -108,12 +108,13 @@ export class AuthService {
         return { rawToken, tokenHash, expiresAt };
     }
 
-    private createEmailVerificationCode(minutesToExpire: number) {
-        const rawCode = crypto.randomInt(100000, 1000000).toString();
+    private createEmailVerificationToken(minutesToExpire: number) {
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const tokenHash = this.tokenHashService.hash(rawToken);
         const expiresAt = new Date();
         expiresAt.setMinutes(expiresAt.getMinutes() + minutesToExpire);
 
-        return { rawCode, expiresAt };
+        return { rawToken, tokenHash, expiresAt };
     }
 
     private hashEmailVerificationCode(userId: string, code: string) {
@@ -126,19 +127,21 @@ export class AuthService {
         return url.toString();
     }
 
-    private async sendVerificationEmail(email: string, code: string) {
+    private async sendVerificationEmail(email: string, token: string) {
+        const verificationUrl = this.buildTokenUrl(env.emailVerificationUrl, token);
         await this.emailService.send({
             to: email,
             subject: 'Verify your MedSphere account',
             text: [
                 'Welcome to MedSphere.',
-                `Your verification code is: ${code}`,
-                'This code expires in 15 minutes.',
+                `Verify your account by opening this link: ${verificationUrl}`,
+                'This link expires in 15 minutes.',
             ].join('\n\n'),
             html: [
                 '<p>Welcome to MedSphere.</p>',
-                `<p>Your verification code is <strong>${code}</strong>.</p>`,
-                '<p>This code expires in 15 minutes.</p>',
+                `<p>Verify your account by opening <a href="${this.escapeHtml(verificationUrl)}">this MedSphere verification link</a>.</p>`,
+                `<p>If the button does not work, copy this URL: <br /><a href="${this.escapeHtml(verificationUrl)}">${this.escapeHtml(verificationUrl)}</a></p>`,
+                '<p>This link expires in 15 minutes.</p>',
             ].join(''),
         });
     }
@@ -309,13 +312,13 @@ export class AuthService {
         }
         await this.authRepository.assignRolesToUser(user.id, [patientRoles[0].id]);
 
-        const verification = this.createEmailVerificationCode(15);
+        const verification = this.createEmailVerificationToken(15);
         await this.authRepository.createEmailVerificationToken({
             userId: user.id,
-            tokenHash: this.hashEmailVerificationCode(user.id, verification.rawCode),
+            tokenHash: verification.tokenHash,
             expiresAt: verification.expiresAt,
         });
-        await this.sendVerificationEmail(user.email, verification.rawCode);
+        await this.sendVerificationEmail(user.email, verification.rawToken);
 
         await this.auditLogService.log({
             userId: user.id,
@@ -333,7 +336,7 @@ export class AuthService {
         });
 
         return {
-            message: 'Registration successful. Check your email for the verification code to activate the account.',
+            message: 'Registration successful. Check your email for the verification link to activate the account.',
             user: {
                 id: user.id,
                 firstName: user.firstName,
@@ -689,7 +692,7 @@ export class AuthService {
             const user = await this.userRepository.findByEmail(email);
 
             if (!user) {
-                throw new AppError('Invalid or expired verification code', 400);
+                throw new AppError('Invalid or expired verification link or code', 400);
             }
 
             if (user.emailVerifiedAt) {
@@ -706,7 +709,7 @@ export class AuthService {
         }
 
         if (!verificationToken) {
-            throw new AppError('Invalid or expired verification code', 400);
+            throw new AppError('Invalid or expired verification link or code', 400);
         }
 
         await this.linkPatientProfileForVerifiedUser(verificationToken.userId);
@@ -733,7 +736,7 @@ export class AuthService {
         const user = await this.userRepository.findByEmail(input.email.trim().toLowerCase());
 
         if (!user) {
-            return { success: true, message: 'If the email exists, a verification code was sent.' };
+            return { success: true, message: 'If the email exists, a verification link was sent.' };
         }
 
         if (user.emailVerifiedAt) {
@@ -742,13 +745,13 @@ export class AuthService {
 
         await this.authRepository.invalidateEmailVerificationTokens(user.id);
 
-        const verification = this.createEmailVerificationCode(15);
+        const verification = this.createEmailVerificationToken(15);
         await this.authRepository.createEmailVerificationToken({
             userId: user.id,
-            tokenHash: this.hashEmailVerificationCode(user.id, verification.rawCode),
+            tokenHash: verification.tokenHash,
             expiresAt: verification.expiresAt,
         });
-        await this.sendVerificationEmail(user.email, verification.rawCode);
+        await this.sendVerificationEmail(user.email, verification.rawToken);
 
         await this.auditLogService.log({
             userId: user.id,
@@ -761,7 +764,7 @@ export class AuthService {
 
         return {
             success: true,
-            message: 'Verification code has been re-issued.',
+            message: 'Verification link has been re-issued.',
         };
     }
 

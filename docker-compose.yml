@@ -55,7 +55,8 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace-with-auth-service-access-secret}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-with-auth-service-refresh-secret}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3005}
-      EMAIL_VERIFICATION_URL: ${EMAIL_VERIFICATION_URL:-http://localhost:3005/api/auth/verify-email}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3001}
+      EMAIL_VERIFICATION_URL: ${EMAIL_VERIFICATION_URL:-http://localhost:3001/verify-email}
       PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-http://localhost:3001/reset-password}
       EMAIL_FROM: ${EMAIL_FROM:-MedSphere <medsphere@noreply.com>}
       CORE_SERVICE_URL: ${CORE_SERVICE_URL_DOCKER:-http://host.docker.internal:3007}

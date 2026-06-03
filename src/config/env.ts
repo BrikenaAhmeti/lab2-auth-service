@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:3005';
+const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:3001';
 
 function parseBoolean(value: string | undefined, fallback = false) {
     if (!value) return fallback;
@@ -21,8 +22,9 @@ export const env = {
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET || '',
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || '',
     appBaseUrl,
+    frontendBaseUrl,
     emailVerificationUrl:
-        process.env.EMAIL_VERIFICATION_URL || `${appBaseUrl}/api/auth/verify-email`,
+        process.env.EMAIL_VERIFICATION_URL || `${frontendBaseUrl}/verify-email`,
     passwordResetUrl: process.env.PASSWORD_RESET_URL || `${appBaseUrl}/reset-password`,
     emailFrom: process.env.EMAIL_FROM || 'MedSphere <medsphere@noreply.com>',
     coreServiceUrl: process.env.CORE_SERVICE_URL || '',
