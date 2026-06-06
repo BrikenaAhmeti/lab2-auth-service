@@ -4,6 +4,7 @@ dotenv.config();
 
 const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:3005';
 const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:3001';
+const frontendOrigins = process.env.FRONTEND_ORIGINS || frontendBaseUrl;
 
 function parseBoolean(value: string | undefined, fallback = false) {
     if (!value) return fallback;
@@ -23,6 +24,7 @@ export const env = {
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || '',
     appBaseUrl,
     frontendBaseUrl,
+    frontendOrigins,
     emailVerificationUrl:
         process.env.EMAIL_VERIFICATION_URL || `${frontendBaseUrl}/verify-email`,
     passwordResetUrl: process.env.PASSWORD_RESET_URL || `${appBaseUrl}/reset-password`,
