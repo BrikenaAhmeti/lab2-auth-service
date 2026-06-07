@@ -188,6 +188,41 @@ export class AuthService {
         };
     }
 
+    async sendContactReplyEmail(input: {
+        name: string;
+        email: string;
+        subject: string;
+        replyText: string;
+    }) {
+        const name = input.name.trim();
+        const email = input.email.trim().toLowerCase();
+        const subject = input.subject.trim();
+        const replyText = input.replyText.trim();
+        const escapedReplyText = this.escapeHtml(replyText).replace(/\r?\n/g, '<br />');
+
+        await this.emailService.send({
+            to: email,
+            subject: `Re: ${subject}`,
+            text: [
+                `Hello ${name || 'there'},`,
+                `Thank you for contacting MedSphere about "${subject}".`,
+                'Reply from our team:',
+                replyText,
+            ].join('\n\n'),
+            html: [
+                `<p>Hello ${this.escapeHtml(name || 'there')},</p>`,
+                `<p>Thank you for contacting MedSphere about <strong>${this.escapeHtml(subject)}</strong>.</p>`,
+                '<p><strong>Reply from our team:</strong></p>',
+                `<p>${escapedReplyText}</p>`,
+            ].join(''),
+        });
+
+        return {
+            success: true,
+            message: 'Contact reply email sent.',
+        };
+    }
+
     private async linkPatientProfileForVerifiedUser(userId: string) {
         if (!this.patientProfileLinker) {
             return;

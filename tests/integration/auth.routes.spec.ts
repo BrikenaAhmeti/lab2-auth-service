@@ -230,6 +230,51 @@ describe('Auth routes', () => {
         });
     });
 
+    it('sends contact replies from the internal route only with the shared key', async () => {
+        process.env.INTERNAL_API_KEY = 'auth-internal-test-key';
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+
+        const sendSpy = jest
+            .spyOn(AuthService.prototype, 'sendContactReplyEmail')
+            .mockResolvedValue({
+                success: true,
+                message: 'Contact reply email sent.',
+            });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const rejected = await request(app)
+            .post('/internal/auth/contact-reply')
+            .send({
+                name: 'Ada Lovelace',
+                email: 'ada@example.com',
+                subject: 'Appointment question',
+                replyText: 'Answered by email',
+            });
+
+        expect(rejected.status).toBe(401);
+
+        const response = await request(app)
+            .post('/internal/auth/contact-reply')
+            .set('x-internal-api-key', 'auth-internal-test-key')
+            .send({
+                name: 'Ada Lovelace',
+                email: 'ada@example.com',
+                subject: 'Appointment question',
+                replyText: 'Answered by email',
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+        expect(sendSpy).toHaveBeenCalledWith({
+            name: 'Ada Lovelace',
+            email: 'ada@example.com',
+            subject: 'Appointment question',
+            replyText: 'Answered by email',
+        });
+    });
+
     it('lists internal user profiles only with the shared key', async () => {
         process.env.INTERNAL_API_KEY = 'auth-internal-test-key';
         const { UserService } = await import('../../src/modules/users/services/user.service');
@@ -354,6 +399,7 @@ describe('Auth routes', () => {
         expect(
             response.body.paths['/internal/auth/contact-acknowledgement'],
         ).toBeDefined();
+        expect(response.body.paths['/internal/auth/contact-reply']).toBeDefined();
         expect(response.body.paths['/internal/users/profiles']).toBeDefined();
         expect(response.body.components.securitySchemes.bearerAuth).toBeDefined();
         expect(response.body.components.securitySchemes.internalApiKey).toBeDefined();
@@ -361,6 +407,7 @@ describe('Auth routes', () => {
         expect(
             response.body.components.schemas.ContactAcknowledgementRequest,
         ).toBeDefined();
+        expect(response.body.components.schemas.ContactReplyRequest).toBeDefined();
         expect(response.body.components.schemas.InternalProfilesRequest).toBeDefined();
     });
 

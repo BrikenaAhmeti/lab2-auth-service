@@ -177,6 +177,36 @@ describe('AuthService', () => {
         );
     });
 
+    it('sends contact reply email through the configured email service', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        const result = await service.sendContactReplyEmail({
+            name: ' Ada Lovelace ',
+            email: 'ADA@EXAMPLE.COM',
+            subject: ' Appointment question ',
+            replyText: ' Yes, we can help. ',
+        });
+
+        expect(result.success).toBe(true);
+        expect(m.emailService.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+                to: 'ada@example.com',
+                subject: 'Re: Appointment question',
+                text: expect.stringContaining('Yes, we can help.'),
+                html: expect.stringContaining('Yes, we can help.'),
+            }),
+        );
+    });
+
     it('logs in with username through the existing email field', async () => {
         const m = createMocks();
         const service = new AuthService(

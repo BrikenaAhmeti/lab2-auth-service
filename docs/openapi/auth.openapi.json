@@ -1105,6 +1105,40 @@
           }
         }
       },
+      "ContactReplyRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "subject",
+          "replyText"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "example": "Ada Lovelace"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ada@example.com"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "example": "Appointment question"
+          },
+          "replyText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "example": "Thanks for contacting us. We can help move your appointment."
+          }
+        }
+      },
       "InternalProfilesRequest": {
         "type": "object",
         "required": [
@@ -2212,6 +2246,48 @@
         "responses": {
           "200": {
             "description": "Contact acknowledgement email was accepted for delivery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/internal/auth/contact-reply": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "summary": "Send contact reply email",
+        "operationId": "sendContactReply",
+        "security": [
+          {
+            "internalApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactReplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact reply email was accepted for delivery.",
             "content": {
               "application/json": {
                 "schema": {

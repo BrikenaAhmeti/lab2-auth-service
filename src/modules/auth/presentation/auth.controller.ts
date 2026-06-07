@@ -95,6 +95,10 @@ const contactAcknowledgementSchema = z.object({
     subject: z.string().trim().min(1).max(200),
 });
 
+const contactReplySchema = contactAcknowledgementSchema.extend({
+    replyText: z.string().trim().min(1).max(2000),
+});
+
 const sessionLogsQuerySchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(25),
@@ -213,6 +217,13 @@ export class AuthController {
     async sendContactAcknowledgement(req: Request, res: Response) {
         const body = contactAcknowledgementSchema.parse(req.body);
         const result = await this.service.sendContactAcknowledgementEmail(body);
+
+        return res.status(200).json(result);
+    }
+
+    async sendContactReply(req: Request, res: Response) {
+        const body = contactReplySchema.parse(req.body);
+        const result = await this.service.sendContactReplyEmail(body);
 
         return res.status(200).json(result);
     }
