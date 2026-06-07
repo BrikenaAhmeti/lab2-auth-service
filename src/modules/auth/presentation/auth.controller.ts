@@ -89,6 +89,10 @@ const createAdminUserSchema = z.object({
     personalNumber: z.string().trim().min(1).max(50).optional(),
 });
 
+const provisionAccountSchema = createAdminUserSchema.extend({
+    actorUserId: z.string().trim().min(1).optional(),
+});
+
 const contactAcknowledgementSchema = z.object({
     name: z.string().trim().min(1).max(200),
     email: z.email(),
@@ -337,6 +341,27 @@ export class AuthController {
 
         const result = await this.service.createAdminUser({
             actorUserId: req.user!.id,
+            firstName: body.firstName,
+            lastName: body.lastName,
+            email: body.email,
+            username: body.username,
+            roles: body.roles,
+            phone: body.phone,
+            dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
+            gender: body.gender,
+            personalNumber: body.personalNumber,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(201).json(result);
+    }
+
+    async provisionAccount(req: Request, res: Response) {
+        const body = provisionAccountSchema.parse(req.body);
+
+        const result = await this.service.provisionAccount({
+            actorUserId: body.actorUserId,
             firstName: body.firstName,
             lastName: body.lastName,
             email: body.email,

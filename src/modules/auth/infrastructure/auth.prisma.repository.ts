@@ -362,7 +362,6 @@ export class AuthPrismaRepository implements AuthRepository {
         roles: string[];
     }> {
         const created = await prisma.$transaction(async (tx) => {
-            const now = new Date();
             const user = await tx.user.create({
                 data: {
                     firstName: data.firstName,
@@ -374,8 +373,8 @@ export class AuthPrismaRepository implements AuthRepository {
                     dateOfBirth: data.dateOfBirth,
                     gender: data.gender,
                     personalNumber: data.personalNumber,
-                    isActive: true,
-                    emailVerifiedAt: now,
+                    isActive: data.isActive ?? true,
+                    emailVerifiedAt: data.emailVerifiedAt === undefined ? new Date() : data.emailVerifiedAt,
                     createdBy: data.createdBy,
                     updatedBy: data.createdBy,
                 },

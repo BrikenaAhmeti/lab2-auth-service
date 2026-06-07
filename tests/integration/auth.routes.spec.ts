@@ -275,6 +275,60 @@ describe('Auth routes', () => {
         });
     });
 
+    it('provisions accounts only from the internal route with the shared key', async () => {
+        process.env.INTERNAL_API_KEY = 'auth-internal-test-key';
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+
+        const provisionSpy = jest
+            .spyOn(AuthService.prototype, 'provisionAccount')
+            .mockResolvedValue({
+                message: 'User account created. A temporary password and confirmation link were sent by email.',
+                user: {
+                    id: 'u300',
+                    email: 'staff@medsphere.local',
+                    firstName: 'New',
+                    lastName: 'Staff',
+                    isActive: false,
+                    roles: ['Doctor'],
+                },
+            });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const rejected = await request(app)
+            .post('/internal/auth/provision-account')
+            .send({
+                firstName: 'New',
+                lastName: 'Staff',
+                email: 'staff@medsphere.local',
+                roles: ['Doctor'],
+            });
+
+        expect(rejected.status).toBe(401);
+
+        const response = await request(app)
+            .post('/internal/auth/provision-account')
+            .set('x-internal-api-key', 'auth-internal-test-key')
+            .send({
+                actorUserId: 'admin-1',
+                firstName: 'New',
+                lastName: 'Staff',
+                email: 'staff@medsphere.local',
+                roles: ['Doctor'],
+            });
+
+        expect(response.status).toBe(201);
+        expect(response.body.user.isActive).toBe(false);
+        expect(provisionSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                actorUserId: 'admin-1',
+                email: 'staff@medsphere.local',
+                roles: ['Doctor'],
+            }),
+        );
+    });
+
     it('lists internal user profiles only with the shared key', async () => {
         process.env.INTERNAL_API_KEY = 'auth-internal-test-key';
         const { UserService } = await import('../../src/modules/users/services/user.service');

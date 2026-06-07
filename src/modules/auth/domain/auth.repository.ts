@@ -17,6 +17,8 @@ export interface CreateAdminUserData {
     dateOfBirth?: Date;
     gender?: string;
     personalNumber?: string;
+    isActive?: boolean;
+    emailVerifiedAt?: Date | null;
     createdBy?: string;
 }
 

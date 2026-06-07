@@ -794,4 +794,72 @@ describe('AuthService', () => {
             }),
         );
     });
+
+    it('provisions an unverified account with a 10 character password and confirmation email', async () => {
+        env.emailVerificationUrl = 'http://localhost:3001/verify-email';
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        m.userRepository.findByEmail.mockResolvedValue(null);
+        m.userRepository.findByUsername.mockResolvedValue(null);
+        m.userRepository.findByPersonalNumber.mockResolvedValue(null);
+        m.authRepository.findRolesByNames.mockResolvedValue([
+            { id: 'r-patient', name: 'Patient' },
+        ]);
+        m.passwordService.generateTemporaryPassword.mockReturnValue('Ab3!cD4$eF');
+        m.passwordService.hash.mockResolvedValue('provisioned-hash');
+        m.tokenHashService.hash.mockReturnValue('verify-hash');
+        m.authRepository.createUserWithRoles.mockResolvedValue({
+            id: 'u300',
+            email: 'new.patient@medsphere.local',
+            username: null,
+            firstName: 'New',
+            lastName: 'Patient',
+            isActive: false,
+            roles: ['Patient'],
+        });
+
+        const result = await service.provisionAccount({
+            actorUserId: 'admin-1',
+            firstName: 'New',
+            lastName: 'Patient',
+            email: 'NEW.PATIENT@MEDSPHERE.LOCAL',
+            roles: ['Patient'],
+            personalNumber: ' 998877 ',
+        });
+
+        expect(result.user.isActive).toBe(false);
+        expect(m.passwordService.generateTemporaryPassword).toHaveBeenCalledWith(10);
+        expect(m.passwordService.hash).toHaveBeenCalledWith('Ab3!cD4$eF');
+        expect(m.authRepository.createUserWithRoles).toHaveBeenCalledWith(
+            expect.objectContaining({
+                email: 'new.patient@medsphere.local',
+                personalNumber: '998877',
+                isActive: false,
+                emailVerifiedAt: null,
+            }),
+            ['r-patient'],
+        );
+        expect(m.authRepository.createEmailVerificationToken).toHaveBeenCalledWith(
+            expect.objectContaining({ userId: 'u300', tokenHash: 'verify-hash' }),
+        );
+        expect(m.emailService.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+                to: 'new.patient@medsphere.local',
+                subject: 'Your MedSphere account is ready',
+                text: expect.stringContaining('Temporary password: Ab3!cD4$eF'),
+            }),
+        );
+        expect(m.emailService.send.mock.calls[0][0].text).toContain(
+            'Confirm your email: http://localhost:3001/verify-email?token=',
+        );
+    });
 });

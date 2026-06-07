@@ -176,3 +176,11 @@ internalAuthRoutes.post('/contact-reply', requireInternalApiKey, async (req, res
     next(error);
   }
 });
+
+internalAuthRoutes.post('/provision-account', requireInternalApiKey, async (req, res, next) => {
+  try {
+    await controller.provisionAccount(req, res);
+  } catch (error) {
+    next(error);
+  }
+});

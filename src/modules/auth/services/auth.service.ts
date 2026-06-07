@@ -289,6 +289,45 @@ export class AuthService {
         });
     }
 
+    private async sendProvisionedAccountEmail(
+        user: {
+            email: string;
+            username?: string | null;
+            firstName: string;
+            lastName: string;
+        },
+        temporaryPassword: string,
+        verificationToken: string,
+    ) {
+        const fullName = `${user.firstName} ${user.lastName}`.trim();
+        const loginIdentifier = user.username || user.email;
+        const verificationUrl = this.buildTokenUrl(env.emailVerificationUrl, verificationToken);
+
+        await this.emailService.send({
+            to: user.email,
+            subject: 'Your MedSphere account is ready',
+            text: [
+                `Hello ${fullName},`,
+                'Your MedSphere account has been created.',
+                `Username/email: ${loginIdentifier}`,
+                `Temporary password: ${temporaryPassword}`,
+                `Confirm your email: ${verificationUrl}`,
+                'This link expires in 15 minutes.',
+                'After confirming your email, sign in and change this password from your profile settings.',
+            ].join('\n\n'),
+            html: [
+                `<p>Hello ${this.escapeHtml(fullName)},</p>`,
+                '<p>Your MedSphere account has been created.</p>',
+                `<p><strong>Username/email:</strong> ${this.escapeHtml(loginIdentifier)}</p>`,
+                `<p><strong>Temporary password:</strong> ${this.escapeHtml(temporaryPassword)}</p>`,
+                `<p>Confirm your email by opening <a href="${this.escapeHtml(verificationUrl)}">this MedSphere confirmation link</a>.</p>`,
+                `<p>If the link does not work, copy this URL: <br /><a href="${this.escapeHtml(verificationUrl)}">${this.escapeHtml(verificationUrl)}</a></p>`,
+                '<p>This link expires in 15 minutes.</p>',
+                '<p>After confirming your email, sign in and change this password from your profile settings.</p>',
+            ].join(''),
+        });
+    }
+
     async registerPatient(input: {
         firstName: string;
         lastName: string;
@@ -1000,6 +1039,107 @@ export class AuthService {
 
         return {
             message: 'User account created successfully.',
+            user,
+        };
+    }
+
+    async provisionAccount(input: {
+        actorUserId?: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        roles: string[];
+        phone?: string;
+        dateOfBirth?: Date;
+        gender?: string;
+        personalNumber?: string;
+        username?: string;
+        ipAddress?: string;
+        userAgent?: string;
+    }) {
+        const email = input.email.trim().toLowerCase();
+        const username = this.normalizeUsername(input.username);
+        const existing = await this.userRepository.findByEmail(email);
+        if (existing) {
+            throw new AppError('Email already in use', 409);
+        }
+
+        if (username) {
+            const existingUsername = await this.userRepository.findByUsername(username);
+            if (existingUsername) {
+                throw new AppError('Username already in use', 409);
+            }
+        }
+
+        const normalizedRoles = Array.from(
+            new Set(input.roles.map((role) => role.trim()).filter(Boolean)),
+        );
+
+        if (normalizedRoles.length === 0) {
+            throw new AppError('At least one role is required', 400);
+        }
+
+        const roles = await this.authRepository.findRolesByNames(normalizedRoles);
+        if (roles.length !== normalizedRoles.length) {
+            throw new AppError('One or more roles are invalid', 400);
+        }
+
+        const normalizedPersonalNumber = normalizedRoles.includes('Patient')
+            ? this.normalizePersonalNumber(input.personalNumber)
+            : input.personalNumber?.trim() || undefined;
+
+        if (normalizedPersonalNumber) {
+            const existingPersonalNumber =
+                await this.userRepository.findByPersonalNumber(normalizedPersonalNumber);
+            if (existingPersonalNumber) {
+                throw new AppError('Personal number already in use', 409);
+            }
+        }
+
+        const temporaryPassword = this.passwordService.generateTemporaryPassword(10);
+        const passwordHash = await this.passwordService.hash(temporaryPassword);
+        const user = await this.authRepository.createUserWithRoles(
+            {
+                firstName: input.firstName.trim(),
+                lastName: input.lastName.trim(),
+                email,
+                username,
+                passwordHash,
+                phone: input.phone?.trim(),
+                dateOfBirth: input.dateOfBirth,
+                gender: input.gender,
+                personalNumber: normalizedPersonalNumber,
+                isActive: false,
+                emailVerifiedAt: null,
+                createdBy: input.actorUserId,
+            },
+            roles.map((role) => role.id),
+        );
+
+        const verification = this.createEmailVerificationToken(15);
+        await this.authRepository.createEmailVerificationToken({
+            userId: user.id,
+            tokenHash: verification.tokenHash,
+            expiresAt: verification.expiresAt,
+        });
+        await this.sendProvisionedAccountEmail(user, temporaryPassword, verification.rawToken);
+
+        await this.auditLogService.log({
+            userId: input.actorUserId,
+            action: 'user.provisioned',
+            entity: 'user',
+            entityId: user.id,
+            newValue: {
+                email: user.email,
+                username: user.username,
+                roles: user.roles,
+            },
+            ipAddress: input.ipAddress,
+            userAgent: input.userAgent,
+        });
+
+        return {
+            message: 'User account created. A temporary password and confirmation link were sent by email.',
             user,
         };
     }
