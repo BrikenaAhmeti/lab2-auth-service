@@ -439,6 +439,44 @@ describe('Auth routes', () => {
         );
     });
 
+    it('accepts internal audit logs from service clients', async () => {
+        process.env.INTERNAL_API_KEY = 'test-internal-api-key';
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+        const recordSpy = jest
+            .spyOn(AuthService.prototype, 'recordAuditLog')
+            .mockResolvedValue({ success: true });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const response = await request(app)
+            .post('/internal/auth/audit-logs')
+            .set('x-internal-api-key', 'test-internal-api-key')
+            .send({
+                userId: 'doctor-1',
+                action: 'chat.message.sent',
+                entity: 'chat_message',
+                entityId: 'message-1',
+                newValue: {
+                    roomId: 'room-1',
+                    contentLength: 12,
+                },
+                ipAddress: '127.0.0.1',
+                userAgent: 'jest',
+            });
+
+        expect(response.status).toBe(201);
+        expect(response.body.success).toBe(true);
+        expect(recordSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'doctor-1',
+                action: 'chat.message.sent',
+                entity: 'chat_message',
+                entityId: 'message-1',
+            }),
+        );
+    });
+
     it('serves the swagger openapi document', async () => {
         const { createApp } = await import('../../src/app');
         const app = createApp();

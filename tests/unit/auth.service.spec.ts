@@ -641,6 +641,51 @@ describe('AuthService', () => {
         );
     });
 
+    it('records internal audit logs from service clients', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        await expect(
+            service.recordAuditLog({
+                userId: 'doctor-1',
+                action: 'chat.message.sent',
+                entity: 'chat_message',
+                entityId: 'message-1',
+                newValue: {
+                    roomId: 'room-1',
+                    recipientIds: ['patient-1'],
+                    type: 'text',
+                    contentLength: 14,
+                },
+                ipAddress: '127.0.0.1',
+                userAgent: 'jest',
+            }),
+        ).resolves.toEqual({ success: true });
+
+        expect(m.auditLogService.log).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'doctor-1',
+                action: 'chat.message.sent',
+                entity: 'chat_message',
+                entityId: 'message-1',
+                newValue: expect.objectContaining({
+                    roomId: 'room-1',
+                    contentLength: 14,
+                }),
+                ipAddress: '127.0.0.1',
+                userAgent: 'jest',
+            }),
+        );
+    });
+
     it('revokes own session and throws when session does not exist', async () => {
         const m = createMocks();
         const service = new AuthService(

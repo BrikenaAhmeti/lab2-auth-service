@@ -683,6 +683,30 @@ export class AuthService {
         });
     }
 
+    async recordAuditLog(input: {
+        userId?: string;
+        action: string;
+        entity: string;
+        entityId?: string;
+        oldValue?: unknown;
+        newValue?: unknown;
+        ipAddress?: string;
+        userAgent?: string;
+    }) {
+        await this.auditLogService.log({
+            userId: input.userId,
+            action: input.action,
+            entity: input.entity,
+            entityId: input.entityId,
+            oldValue: input.oldValue as any,
+            newValue: input.newValue as any,
+            ipAddress: input.ipAddress,
+            userAgent: input.userAgent,
+        });
+
+        return { success: true };
+    }
+
     async revokeSession(input: {
         userId: string;
         sessionId: string;

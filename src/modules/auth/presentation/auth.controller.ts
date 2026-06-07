@@ -114,6 +114,22 @@ const sessionLogsQuerySchema = z.object({
     to: z.string().trim().optional(),
 });
 
+const optionalAuditTextSchema = (max: number) =>
+    z.string().trim().min(1).max(max).optional().nullable();
+
+const internalAuditLogSchema = z
+    .object({
+        userId: optionalAuditTextSchema(120),
+        action: z.string().trim().min(1).max(120),
+        entity: z.string().trim().min(1).max(120),
+        entityId: optionalAuditTextSchema(200),
+        oldValue: z.unknown().optional(),
+        newValue: z.unknown().optional(),
+        ipAddress: optionalAuditTextSchema(120),
+        userAgent: optionalAuditTextSchema(1000),
+    })
+    .strict();
+
 function parseQueryDate(value?: string) {
     if (!value) return undefined;
 
@@ -298,6 +314,22 @@ export class AuthController {
         });
 
         return res.status(200).json(result);
+    }
+
+    async recordAuditLog(req: Request, res: Response) {
+        const body = internalAuditLogSchema.parse(req.body);
+        const result = await this.service.recordAuditLog({
+            userId: body.userId ?? undefined,
+            action: body.action,
+            entity: body.entity,
+            entityId: body.entityId ?? undefined,
+            oldValue: body.oldValue,
+            newValue: body.newValue,
+            ipAddress: body.ipAddress ?? undefined,
+            userAgent: body.userAgent ?? undefined,
+        });
+
+        return res.status(201).json(result);
     }
 
     async revokeSession(req: Request<{ id: string }>, res: Response) {

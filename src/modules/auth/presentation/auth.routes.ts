@@ -184,3 +184,11 @@ internalAuthRoutes.post('/provision-account', requireInternalApiKey, async (req,
     next(error);
   }
 });
+
+internalAuthRoutes.post('/audit-logs', requireInternalApiKey, async (req, res, next) => {
+  try {
+    await controller.recordAuditLog(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
