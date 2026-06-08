@@ -177,6 +177,9 @@ describe('AuthService', () => {
             username: 'patient',
             firstName: 'Olivia',
             lastName: 'Brown',
+            phone: '+1 555 0105',
+            dateOfBirth: new Date('1990-04-12T00:00:00.000Z'),
+            gender: 'female',
             personalNumber: 'MSP-PAT-0005',
             passwordHash: 'hashed',
             isActive: true,
@@ -228,6 +231,9 @@ describe('AuthService', () => {
             username: 'patient',
             firstName: 'Olivia',
             lastName: 'Brown',
+            phone: '+1 555 0105',
+            dateOfBirth: new Date('1990-04-12T00:00:00.000Z'),
+            gender: 'female',
             personalNumber: 'MSP-PAT-0005',
             passwordHash: 'hashed',
             isActive: true,
@@ -249,6 +255,12 @@ describe('AuthService', () => {
         expect(patientProfileLinker.linkByPersonalNumber).toHaveBeenCalledWith({
             userId: 'u1',
             personalNumber: 'MSP-PAT-0005',
+            firstName: 'Olivia',
+            lastName: 'Brown',
+            email: 'patient@medsphere.local',
+            phone: '+1 555 0105',
+            dateOfBirth: new Date('1990-04-12T00:00:00.000Z'),
+            gender: 'female',
         });
     });
 
@@ -554,6 +566,142 @@ describe('AuthService', () => {
         );
     });
 
+    it('syncs the core patient profile during patient registration', async () => {
+        env.emailVerificationUrl = 'http://localhost:3001/verify-email';
+        const m = createMocks();
+        const patientProfileLinker = {
+            findByUserId: jest.fn(),
+            linkByPersonalNumber: jest.fn().mockResolvedValue({
+                linked: true,
+                patientId: 'patient-100',
+                userId: 'u100',
+            }),
+        };
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+            patientProfileLinker,
+        );
+        const dateOfBirth = new Date('1994-02-03T00:00:00.000Z');
+
+        m.userRepository.findByEmail.mockResolvedValue(null);
+        m.userRepository.findByUsername.mockResolvedValue(null);
+        m.userRepository.findByPersonalNumber.mockResolvedValue(null);
+        m.authRepository.findRolesByNames.mockResolvedValue([{ id: 'role-patient', name: 'Patient' }]);
+        m.authRepository.assignRolesToUser.mockResolvedValue();
+        m.passwordService.hash.mockResolvedValue('hashed-password');
+        m.userRepository.create.mockResolvedValue({
+            id: 'u100',
+            firstName: 'Auto',
+            lastName: 'Detailing',
+            email: 'autodetailingwaxon@example.com',
+            username: 'auto-detailing',
+            phone: '+38344123456',
+            dateOfBirth,
+            gender: 'female',
+            personalNumber: 'PN-REG-100',
+            isActive: false,
+        });
+        m.tokenHashService.hash.mockReturnValue('verify-hash');
+        m.authRepository.createEmailVerificationToken.mockResolvedValue();
+
+        await service.registerPatient({
+            firstName: 'Auto',
+            lastName: 'Detailing',
+            email: 'autodetailingwaxon@example.com',
+            username: 'Auto-Detailing',
+            password: 'StrongPass123!',
+            phone: '+38344123456',
+            dateOfBirth,
+            gender: 'female',
+            personalNumber: ' PN-REG-100 ',
+        });
+
+        expect(patientProfileLinker.linkByPersonalNumber).toHaveBeenCalledWith({
+            userId: 'u100',
+            personalNumber: 'PN-REG-100',
+            firstName: 'Auto',
+            lastName: 'Detailing',
+            email: 'autodetailingwaxon@example.com',
+            phone: '+38344123456',
+            dateOfBirth,
+            gender: 'female',
+        });
+        expect(m.authRepository.createEmailVerificationToken).toHaveBeenCalled();
+        expect(m.emailService.send).toHaveBeenCalled();
+    });
+
+    it('continues patient registration when the registration-time profile sync fails', async () => {
+        env.emailVerificationUrl = 'http://localhost:3001/verify-email';
+        const m = createMocks();
+        const patientProfileLinker = {
+            findByUserId: jest.fn(),
+            linkByPersonalNumber: jest.fn().mockRejectedValue(new Error('core offline')),
+        };
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+            patientProfileLinker,
+        );
+
+        m.userRepository.findByEmail.mockResolvedValue(null);
+        m.userRepository.findByUsername.mockResolvedValue(null);
+        m.userRepository.findByPersonalNumber.mockResolvedValue(null);
+        m.authRepository.findRolesByNames.mockResolvedValue([{ id: 'role-patient', name: 'Patient' }]);
+        m.authRepository.assignRolesToUser.mockResolvedValue();
+        m.passwordService.hash.mockResolvedValue('hashed-password');
+        m.userRepository.create.mockResolvedValue({
+            id: 'u100',
+            firstName: 'Auto',
+            lastName: 'Detailing',
+            email: 'autodetailingwaxon@example.com',
+            username: 'auto-detailing',
+            personalNumber: 'PN-REG-100',
+            isActive: false,
+        });
+        m.tokenHashService.hash.mockReturnValue('verify-hash');
+        m.authRepository.createEmailVerificationToken.mockResolvedValue();
+
+        const result = await service.registerPatient({
+            firstName: 'Auto',
+            lastName: 'Detailing',
+            email: 'autodetailingwaxon@example.com',
+            username: 'Auto-Detailing',
+            password: 'StrongPass123!',
+            personalNumber: ' PN-REG-100 ',
+            ipAddress: '127.0.0.1',
+            userAgent: 'vitest',
+        });
+
+        expect(result.user.email).toBe('autodetailingwaxon@example.com');
+        expect(patientProfileLinker.linkByPersonalNumber).toHaveBeenCalled();
+        expect(m.authRepository.createEmailVerificationToken).toHaveBeenCalled();
+        expect(m.emailService.send).toHaveBeenCalled();
+        expect(m.auditLogService.log).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'u100',
+                action: 'patient.profile.sync.failed',
+                entity: 'patient',
+                newValue: expect.objectContaining({
+                    phase: 'registration',
+                    reason: 'core offline',
+                }),
+                ipAddress: '127.0.0.1',
+                userAgent: 'vitest',
+            }),
+        );
+    });
+
     it('requires personal number when a patient registers', async () => {
         const m = createMocks();
         const service = new AuthService(
@@ -668,6 +816,12 @@ describe('AuthService', () => {
         });
         m.userRepository.findById.mockResolvedValue({
             id: 'u1',
+            firstName: 'Olivia',
+            lastName: 'Brown',
+            email: 'patient@medsphere.local',
+            phone: '+1 555 0105',
+            dateOfBirth: new Date('1990-04-12T00:00:00.000Z'),
+            gender: 'female',
             personalNumber: '1234567890',
         });
         m.authRepository.markEmailVerificationTokenUsed.mockResolvedValue();
@@ -679,6 +833,12 @@ describe('AuthService', () => {
         expect(patientProfileLinker.linkByPersonalNumber).toHaveBeenCalledWith({
             userId: 'u1',
             personalNumber: '1234567890',
+            firstName: 'Olivia',
+            lastName: 'Brown',
+            email: 'patient@medsphere.local',
+            phone: '+1 555 0105',
+            dateOfBirth: new Date('1990-04-12T00:00:00.000Z'),
+            gender: 'female',
         });
         expect(m.authRepository.markUserEmailVerified).toHaveBeenCalledWith('u1');
     });

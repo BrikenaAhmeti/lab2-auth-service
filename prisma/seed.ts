@@ -641,6 +641,7 @@ const ROLE_PERMISSION_SCOPES: Record<RoleName, PermissionGrant[]> = {
             'patients:manage',
             'appointments:read',
             'appointments:create',
+            'appointments:update',
             'appointments:cancel',
             'medical_records:read',
             'prescriptions:read',

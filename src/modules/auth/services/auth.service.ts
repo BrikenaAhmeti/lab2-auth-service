@@ -72,6 +72,22 @@ export class AuthService {
         };
     }
 
+    private patientProfileLinkPayload(user: Pick<
+        AuthUserView,
+        'id' | 'firstName' | 'lastName' | 'email' | 'phone' | 'dateOfBirth' | 'gender' | 'personalNumber'
+    >) {
+        return {
+            userId: user.id,
+            personalNumber: user.personalNumber!,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone ?? null,
+            dateOfBirth: user.dateOfBirth ?? null,
+            gender: user.gender ?? null,
+        };
+    }
+
     private async resolvePatientProfileFields(user: AuthUserView) {
         if (!this.patientProfileLinker || !this.isPatientUser(user)) {
             return {};
@@ -95,10 +111,9 @@ export class AuthService {
         }
 
         try {
-            const linkedProfile = await this.patientProfileLinker.linkByPersonalNumber({
-                userId: user.id,
-                personalNumber: user.personalNumber,
-            });
+            const linkedProfile = await this.patientProfileLinker.linkByPersonalNumber(
+                this.patientProfileLinkPayload(user),
+            );
 
             return this.patientProfileFields(linkedProfile.patientId);
         } catch {
@@ -289,20 +304,51 @@ export class AuthService {
     }
 
     private async linkPatientProfileForVerifiedUser(userId: string) {
+        const user = await this.userRepository.findById(userId);
+        await this.linkPatientProfileForUser(user);
+    }
+
+    private async linkPatientProfileForUser(user: Pick<
+        AuthUserView,
+        'id' | 'firstName' | 'lastName' | 'email' | 'phone' | 'dateOfBirth' | 'gender' | 'personalNumber'
+    > | null | undefined) {
         if (!this.patientProfileLinker) {
             return;
         }
-
-        const user = await this.userRepository.findById(userId);
-
         if (!user?.personalNumber) {
             return;
         }
 
-        await this.patientProfileLinker.linkByPersonalNumber({
-            userId: user.id,
-            personalNumber: user.personalNumber,
-        });
+        await this.patientProfileLinker.linkByPersonalNumber(this.patientProfileLinkPayload(user));
+    }
+
+    private async tryLinkPatientProfileDuringRegistration(
+        user: Pick<
+            AuthUserView,
+            'id' | 'firstName' | 'lastName' | 'email' | 'phone' | 'dateOfBirth' | 'gender' | 'personalNumber'
+        > | null | undefined,
+        context: { ipAddress?: string; userAgent?: string },
+    ) {
+        try {
+            await this.linkPatientProfileForUser(user);
+        } catch (error) {
+            try {
+                await this.auditLogService.log({
+                    userId: user?.id,
+                    action: 'patient.profile.sync.failed',
+                    entity: 'patient',
+                    entityId: user?.id,
+                    newValue: {
+                        phase: 'registration',
+                        reason: error instanceof Error ? error.message : 'Unknown error',
+                    },
+                    ipAddress: context.ipAddress,
+                    userAgent: context.userAgent,
+                });
+            } catch {
+                return;
+            }
+        }
     }
 
     private escapeHtml(value: string) {
@@ -450,6 +496,10 @@ export class AuthService {
             throw new AppError('Patient role is not configured', 500);
         }
         await this.authRepository.assignRolesToUser(user.id, [patientRoles[0].id]);
+        await this.tryLinkPatientProfileDuringRegistration(user, {
+            ipAddress: input.ipAddress,
+            userAgent: input.userAgent,
+        });
 
         const verification = this.createEmailVerificationToken(15);
         await this.authRepository.createEmailVerificationToken({

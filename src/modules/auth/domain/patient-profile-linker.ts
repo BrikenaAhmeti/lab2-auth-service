@@ -7,6 +7,12 @@ export interface PatientProfileLinker {
     linkByPersonalNumber(input: {
         userId: string;
         personalNumber: string;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string | null;
+        dateOfBirth?: Date | string | null;
+        gender?: string | null;
     }): Promise<{
         linked: boolean;
         patientId: string | null;

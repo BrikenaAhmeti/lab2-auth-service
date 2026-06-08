@@ -34,6 +34,9 @@ export interface AuthUserView {
     username?: string | null;
     firstName: string;
     lastName: string;
+    phone?: string | null;
+    dateOfBirth?: Date | null;
+    gender?: string | null;
     personalNumber?: string | null;
     passwordHash: string;
     isActive: boolean;

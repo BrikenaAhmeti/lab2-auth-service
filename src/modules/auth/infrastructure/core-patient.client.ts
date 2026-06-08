@@ -39,7 +39,16 @@ export class CorePatientClient implements PatientProfileLinker {
         return response.json();
     }
 
-    async linkByPersonalNumber(input: { userId: string; personalNumber: string }) {
+    async linkByPersonalNumber(input: {
+        userId: string;
+        personalNumber: string;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string | null;
+        dateOfBirth?: Date | string | null;
+        gender?: string | null;
+    }) {
         if (!this.baseUrl || !this.internalApiKey) {
             throw new AppError('Patient profile linking is not configured', 500);
         }
