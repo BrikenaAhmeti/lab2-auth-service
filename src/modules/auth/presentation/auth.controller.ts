@@ -63,21 +63,10 @@ const forgotPasswordSchema = z.object({
     email: z.email(),
 });
 
-const resetPasswordSchema = z
-    .object({
-        token: z.string().min(1).optional(),
-        code: z.string().min(1).optional(),
-        password: z.string().min(12).max(100).optional(),
-        newPassword: z.string().min(12).max(100).optional(),
-    })
-    .refine((body) => body.token || body.code, {
-        message: 'token or code is required',
-        path: ['token'],
-    })
-    .refine((body) => body.password || body.newPassword, {
-        message: 'password or newPassword is required',
-        path: ['password'],
-    });
+const resetPasswordSchema = z.object({
+    token: z.string().min(1),
+    newPassword: z.string().min(12).max(100),
+});
 
 const logoutSchema = z.object({
     refreshToken: z.string().min(1),
@@ -100,10 +89,18 @@ const createAdminUserSchema = z.object({
     personalNumber: z.string().trim().min(1).max(50).optional(),
 });
 
+const provisionAccountSchema = createAdminUserSchema.extend({
+    actorUserId: z.string().trim().min(1).optional(),
+});
+
 const contactAcknowledgementSchema = z.object({
     name: z.string().trim().min(1).max(200),
     email: z.email(),
     subject: z.string().trim().min(1).max(200),
+});
+
+const contactReplySchema = contactAcknowledgementSchema.extend({
+    replyText: z.string().trim().min(1).max(2000),
 });
 
 const sessionLogsQuerySchema = z.object({
@@ -116,6 +113,22 @@ const sessionLogsQuerySchema = z.object({
     from: z.string().trim().optional(),
     to: z.string().trim().optional(),
 });
+
+const optionalAuditTextSchema = (max: number) =>
+    z.string().trim().min(1).max(max).optional().nullable();
+
+const internalAuditLogSchema = z
+    .object({
+        userId: optionalAuditTextSchema(120),
+        action: z.string().trim().min(1).max(120),
+        entity: z.string().trim().min(1).max(120),
+        entityId: optionalAuditTextSchema(200),
+        oldValue: z.unknown().optional(),
+        newValue: z.unknown().optional(),
+        ipAddress: optionalAuditTextSchema(120),
+        userAgent: optionalAuditTextSchema(1000),
+    })
+    .strict();
 
 function parseQueryDate(value?: string) {
     if (!value) return undefined;
@@ -228,6 +241,13 @@ export class AuthController {
         return res.status(200).json(result);
     }
 
+    async sendContactReply(req: Request, res: Response) {
+        const body = contactReplySchema.parse(req.body);
+        const result = await this.service.sendContactReplyEmail(body);
+
+        return res.status(200).json(result);
+    }
+
     async forgotPassword(req: Request, res: Response) {
         const body = forgotPasswordSchema.parse(req.body);
 
@@ -244,8 +264,8 @@ export class AuthController {
         const body = resetPasswordSchema.parse(req.body);
 
         const result = await this.service.resetPassword({
-            token: body.token ?? body.code!,
-            newPassword: body.password ?? body.newPassword!,
+            token: body.token,
+            newPassword: body.newPassword,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
         });
@@ -275,24 +295,6 @@ export class AuthController {
             userId: req.user!.id,
             roles: req.user!.roles,
         });
-        return res.status(200).json(result);
-    }
-
-    async sessionLogs(req: Request, res: Response) {
-        const query = sessionLogsQuerySchema.parse(req.query);
-        const result = await this.service.getSessionLogs({
-            viewerUserId: req.user!.id,
-            roles: req.user!.roles,
-            page: query.page,
-            limit: query.limit,
-            action: query.action,
-            userId: query.userId,
-            userSearch: query.userSearch,
-            changed: query.changed,
-            from: parseQueryDate(query.from),
-            to: parseQueryDate(query.to),
-        });
-
         return res.status(200).json(result);
     }
 
@@ -371,6 +373,27 @@ export class AuthController {
 
         const result = await this.service.createAdminUser({
             actorUserId: req.user!.id,
+            firstName: body.firstName,
+            lastName: body.lastName,
+            email: body.email,
+            username: body.username,
+            roles: body.roles,
+            phone: body.phone,
+            dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
+            gender: body.gender,
+            personalNumber: body.personalNumber,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(201).json(result);
+    }
+
+    async provisionAccount(req: Request, res: Response) {
+        const body = provisionAccountSchema.parse(req.body);
+
+        const result = await this.service.provisionAccount({
+            actorUserId: body.actorUserId,
             firstName: body.firstName,
             lastName: body.lastName,
             email: body.email,

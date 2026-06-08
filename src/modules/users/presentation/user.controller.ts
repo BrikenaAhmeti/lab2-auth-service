@@ -12,11 +12,6 @@ const updateMeSchema = z.object({
     dateOfBirth: z.string().nullable().optional(),
     gender: z.string().nullable().optional(),
     avatarFileId: z.string().nullable().optional(),
-    avatarUrl: z.string().trim().max(2000).nullable().optional(),
-});
-
-const internalProfilesSchema = z.object({
-    userIds: z.array(z.string().uuid('Invalid user id')).max(100),
 });
 
 const internalProfilesSchema = z.object({
@@ -61,7 +56,6 @@ export class UserController {
                         : undefined,
             gender: body.gender,
             avatarFileId: body.avatarFileId,
-            avatarUrl: body.avatarUrl,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
         });
