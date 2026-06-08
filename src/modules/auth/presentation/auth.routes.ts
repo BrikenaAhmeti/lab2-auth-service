@@ -168,3 +168,27 @@ internalAuthRoutes.post('/contact-acknowledgement', requireInternalApiKey, async
     next(error);
   }
 });
+
+internalAuthRoutes.post('/contact-reply', requireInternalApiKey, async (req, res, next) => {
+  try {
+    await controller.sendContactReply(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+internalAuthRoutes.post('/audit-logs', requireInternalApiKey, async (req, res, next) => {
+  try {
+    await controller.recordAuditLog(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+internalAuthRoutes.post('/provision-account', requireInternalApiKey, async (req, res, next) => {
+  try {
+    await controller.provisionAccount(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
