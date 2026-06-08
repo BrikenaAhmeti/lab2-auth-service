@@ -311,8 +311,13 @@ export class AuthService {
     private async linkPatientProfileForUser(user: Pick<
         AuthUserView,
         'id' | 'firstName' | 'lastName' | 'email' | 'phone' | 'dateOfBirth' | 'gender' | 'personalNumber'
-    > | null | undefined) {
+    > & {
+        roles?: string[];
+    } | null | undefined) {
         if (!this.patientProfileLinker) {
+            return;
+        }
+        if (user?.roles && !user.roles.includes('Patient')) {
             return;
         }
         if (!user?.personalNumber) {
