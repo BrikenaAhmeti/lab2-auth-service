@@ -150,6 +150,108 @@ describe('AuthService', () => {
         expect(m.authRepository.createRefreshToken).toHaveBeenCalled();
     });
 
+    it('adds the linked patient profile id to patient login sessions', async () => {
+        const m = createMocks();
+        const patientProfileLinker = {
+            findByUserId: jest.fn().mockResolvedValue({
+                patientId: 'patient-1',
+                patientProfileId: 'patient-1',
+                userId: 'u1',
+            }),
+            linkByPersonalNumber: jest.fn(),
+        };
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+            patientProfileLinker,
+        );
+
+        m.authRepository.getUserAuthByIdentifier.mockResolvedValue({
+            id: 'u1',
+            email: 'patient@medsphere.local',
+            username: 'patient',
+            firstName: 'Olivia',
+            lastName: 'Brown',
+            personalNumber: 'MSP-PAT-0005',
+            passwordHash: 'hashed',
+            isActive: true,
+            roles: ['Patient'],
+            permissions: ['patients:read:own'],
+        });
+        m.passwordService.compare.mockResolvedValue(true);
+        m.jwtService.signAccessToken.mockReturnValue('access-token');
+        m.jwtService.signRefreshToken.mockReturnValue('refresh-token');
+        m.tokenHashService.hash.mockReturnValue('refresh-hash');
+        m.authRepository.createRefreshToken.mockResolvedValue();
+
+        const result = await service.login({
+            email: 'patient@medsphere.local',
+            password: 'Medsphere@123',
+        });
+
+        expect(result.user.patientId).toBe('patient-1');
+        expect(result.user.patientProfileId).toBe('patient-1');
+        expect(result.user.profileId).toBe('patient-1');
+        expect(patientProfileLinker.findByUserId).toHaveBeenCalledWith('u1');
+        expect(patientProfileLinker.linkByPersonalNumber).not.toHaveBeenCalled();
+    });
+
+    it('links by personal number when a patient login has no linked profile yet', async () => {
+        const m = createMocks();
+        const patientProfileLinker = {
+            findByUserId: jest.fn().mockRejectedValue(new AppError('Patient profile not found', 404)),
+            linkByPersonalNumber: jest.fn().mockResolvedValue({
+                linked: true,
+                patientId: 'patient-1',
+                userId: 'u1',
+            }),
+        };
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+            patientProfileLinker,
+        );
+
+        m.authRepository.getUserAuthByIdentifier.mockResolvedValue({
+            id: 'u1',
+            email: 'patient@medsphere.local',
+            username: 'patient',
+            firstName: 'Olivia',
+            lastName: 'Brown',
+            personalNumber: 'MSP-PAT-0005',
+            passwordHash: 'hashed',
+            isActive: true,
+            roles: ['Patient'],
+            permissions: ['patients:read:own'],
+        });
+        m.passwordService.compare.mockResolvedValue(true);
+        m.jwtService.signAccessToken.mockReturnValue('access-token');
+        m.jwtService.signRefreshToken.mockReturnValue('refresh-token');
+        m.tokenHashService.hash.mockReturnValue('refresh-hash');
+        m.authRepository.createRefreshToken.mockResolvedValue();
+
+        const result = await service.login({
+            email: 'patient@medsphere.local',
+            password: 'Medsphere@123',
+        });
+
+        expect(result.user.patientId).toBe('patient-1');
+        expect(patientProfileLinker.linkByPersonalNumber).toHaveBeenCalledWith({
+            userId: 'u1',
+            personalNumber: 'MSP-PAT-0005',
+        });
+    });
+
     it('sends contact acknowledgement email through the configured email service', async () => {
         const m = createMocks();
         const service = new AuthService(
@@ -319,6 +421,56 @@ describe('AuthService', () => {
         expect(result.refreshToken).toBe('new-refresh');
         expect(m.authRepository.touchRefreshToken).toHaveBeenCalledWith('old-hash');
         expect(m.authRepository.revokeRefreshToken).toHaveBeenCalledWith('old-hash');
+    });
+
+    it('adds the linked patient profile id to refreshed patient sessions', async () => {
+        const m = createMocks();
+        const patientProfileLinker = {
+            findByUserId: jest.fn().mockResolvedValue({
+                patientId: 'patient-1',
+                patientProfileId: 'patient-1',
+                userId: 'u1',
+            }),
+            linkByPersonalNumber: jest.fn(),
+        };
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+            patientProfileLinker,
+        );
+
+        m.jwtService.verifyRefreshToken.mockReturnValue({ sub: 'u1' });
+        m.tokenHashService.hash
+            .mockReturnValueOnce('old-hash')
+            .mockReturnValueOnce('new-hash');
+        m.authRepository.findValidRefreshToken.mockResolvedValue({ id: 'rt1' });
+        m.authRepository.touchRefreshToken.mockResolvedValue();
+        m.authRepository.revokeRefreshToken.mockResolvedValue(1);
+        m.authRepository.getUserAuthById.mockResolvedValue({
+            id: 'u1',
+            email: 'patient@medsphere.local',
+            username: 'patient',
+            firstName: 'Olivia',
+            lastName: 'Brown',
+            personalNumber: 'MSP-PAT-0005',
+            passwordHash: 'hashed',
+            isActive: true,
+            roles: ['Patient'],
+            permissions: ['patients:read:own'],
+        });
+        m.jwtService.signAccessToken.mockReturnValue('new-access');
+        m.jwtService.signRefreshToken.mockReturnValue('new-refresh');
+        m.authRepository.createRefreshToken.mockResolvedValue();
+
+        const result = await service.refresh({ refreshToken: 'old-raw-token' });
+
+        expect(result.user.patientId).toBe('patient-1');
+        expect(patientProfileLinker.findByUserId).toHaveBeenCalledWith('u1');
     });
 
     it('rejects refresh when token is not found', async () => {
@@ -491,6 +643,7 @@ describe('AuthService', () => {
     it('links the patient profile by personal number during email verification', async () => {
         const m = createMocks();
         const patientProfileLinker = {
+            findByUserId: jest.fn(),
             linkByPersonalNumber: jest.fn().mockResolvedValue({
                 linked: true,
                 patientId: 'patient-1',
@@ -528,6 +681,47 @@ describe('AuthService', () => {
             personalNumber: '1234567890',
         });
         expect(m.authRepository.markUserEmailVerified).toHaveBeenCalledWith('u1');
+    });
+
+    it('adds the linked patient profile id to auth me responses', async () => {
+        const m = createMocks();
+        const patientProfileLinker = {
+            findByUserId: jest.fn().mockResolvedValue({
+                patientId: 'patient-1',
+                patientProfileId: 'patient-1',
+                userId: 'u1',
+            }),
+            linkByPersonalNumber: jest.fn(),
+        };
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+            patientProfileLinker,
+        );
+
+        m.authRepository.getUserAuthById.mockResolvedValue({
+            id: 'u1',
+            email: 'patient@medsphere.local',
+            username: 'patient',
+            firstName: 'Olivia',
+            lastName: 'Brown',
+            personalNumber: 'MSP-PAT-0005',
+            passwordHash: 'hashed',
+            isActive: true,
+            roles: ['Patient'],
+            permissions: ['patients:read:own'],
+        });
+
+        const result = await service.me('u1');
+
+        expect(result.patientId).toBe('patient-1');
+        expect(result.patientProfileId).toBe('patient-1');
+        expect(result.profileId).toBe('patient-1');
     });
 
     it('requests and completes password reset', async () => {

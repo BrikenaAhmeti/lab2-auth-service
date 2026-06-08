@@ -7,7 +7,7 @@ import { TokenHashService } from '../../../shared/services/token-hash.service';
 import { EmailService } from '../../../shared/services/email.service';
 import { AuditLogService } from '../../audit-logs/services/audit-log.service';
 import { UserRepository } from '../../users/domain/user.repository';
-import { ActiveSessionView, AuthRepository } from '../domain/auth.repository';
+import { ActiveSessionView, AuthRepository, AuthUserView } from '../domain/auth.repository';
 import { PatientProfileLinker } from '../domain/patient-profile-linker';
 
 export class AuthService {
@@ -54,6 +54,71 @@ export class AuthService {
 
     private canViewAllSessions(roles: string[]) {
         return roles.includes('Admin') || roles.includes('Super Admin');
+    }
+
+    private isPatientUser(user: Pick<AuthUserView, 'roles'>) {
+        return user.roles.includes('Patient');
+    }
+
+    private patientProfileFields(patientId?: string | null) {
+        if (!patientId) {
+            return {};
+        }
+
+        return {
+            patientId,
+            patientProfileId: patientId,
+            profileId: patientId,
+        };
+    }
+
+    private async resolvePatientProfileFields(user: AuthUserView) {
+        if (!this.patientProfileLinker || !this.isPatientUser(user)) {
+            return {};
+        }
+
+        try {
+            const profile = await this.patientProfileLinker.findByUserId(user.id);
+            const patientId = profile.patientId ?? profile.patientProfileId;
+
+            if (patientId) {
+                return this.patientProfileFields(patientId);
+            }
+        } catch (error) {
+            if (!(error instanceof AppError) || error.statusCode !== 404) {
+                return {};
+            }
+        }
+
+        if (!user.personalNumber) {
+            return {};
+        }
+
+        try {
+            const linkedProfile = await this.patientProfileLinker.linkByPersonalNumber({
+                userId: user.id,
+                personalNumber: user.personalNumber,
+            });
+
+            return this.patientProfileFields(linkedProfile.patientId);
+        } catch {
+            return {};
+        }
+    }
+
+    private async sessionUser(user: AuthUserView) {
+        const patientProfile = await this.resolvePatientProfileFields(user);
+
+        return {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            roles: user.roles,
+            permissions: user.permissions,
+            ...patientProfile,
+        };
     }
 
     private sessionAuditValue(session: ActiveSessionView) {
@@ -514,15 +579,7 @@ export class AuthService {
         return {
             accessToken,
             refreshToken,
-            user: {
-                id: user.id,
-                email: user.email,
-                username: user.username,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                roles: user.roles,
-                permissions: user.permissions,
-            },
+            user: await this.sessionUser(user),
         };
     }
 
@@ -592,15 +649,7 @@ export class AuthService {
         return {
             accessToken,
             refreshToken,
-            user: {
-                id: user.id,
-                email: user.email,
-                username: user.username,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                roles: user.roles,
-                permissions: user.permissions,
-            },
+            user: await this.sessionUser(user),
         };
     }
 
@@ -638,15 +687,7 @@ export class AuthService {
             throw new AppError('User not found', 404);
         }
 
-        return {
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            roles: user.roles,
-            permissions: user.permissions,
-        };
+        return this.sessionUser(user);
     }
 
     async getSessions(input: { userId: string; roles: string[] }) {

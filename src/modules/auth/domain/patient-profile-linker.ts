@@ -1,4 +1,9 @@
 export interface PatientProfileLinker {
+    findByUserId(userId: string): Promise<{
+        patientId: string | null;
+        patientProfileId?: string | null;
+        userId: string | null;
+    }>;
     linkByPersonalNumber(input: {
         userId: string;
         personalNumber: string;
