@@ -296,6 +296,40 @@ export class AuthController {
         return res.status(200).json(result);
     }
 
+    async sessionLogs(req: Request, res: Response) {
+        const query = sessionLogsQuerySchema.parse(req.query);
+        const result = await this.service.getSessionLogs({
+            viewerUserId: req.user!.id,
+            roles: req.user!.roles,
+            page: query.page,
+            limit: query.limit,
+            action: query.action,
+            userId: query.userId,
+            userSearch: query.userSearch,
+            changed: query.changed,
+            from: parseQueryDate(query.from),
+            to: parseQueryDate(query.to),
+        });
+
+        return res.status(200).json(result);
+    }
+
+    async recordAuditLog(req: Request, res: Response) {
+        const body = internalAuditLogSchema.parse(req.body);
+        const result = await this.service.recordAuditLog({
+            userId: body.userId ?? undefined,
+            action: body.action,
+            entity: body.entity,
+            entityId: body.entityId ?? undefined,
+            oldValue: body.oldValue,
+            newValue: body.newValue,
+            ipAddress: body.ipAddress ?? undefined,
+            userAgent: body.userAgent ?? undefined,
+        });
+
+        return res.status(201).json(result);
+    }
+
     async revokeSession(req: Request<{ id: string }>, res: Response) {
         const result = await this.service.revokeSession({
             userId: req.user!.id,

@@ -15,6 +15,8 @@ for (const envFile of envFiles) {
 }
 
 const appBaseUrl = process.env.APP_BASE_URL || 'http://localhost:3005';
+const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:3001';
+const frontendOrigins = process.env.FRONTEND_ORIGINS || frontendBaseUrl;
 
 function parseBoolean(value: string | undefined, fallback = false) {
     if (!value) return fallback;
@@ -33,6 +35,8 @@ export const env = {
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET || '',
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || '',
     appBaseUrl,
+    frontendBaseUrl,
+    frontendOrigins,
     emailVerificationUrl:
         process.env.EMAIL_VERIFICATION_URL || `${appBaseUrl}/api/auth/verify-email`,
     passwordResetUrl: process.env.PASSWORD_RESET_URL || 'medspheremobile://reset-password',

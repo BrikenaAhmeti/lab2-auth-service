@@ -1554,12 +1554,6 @@
                       "success": true,
                       "message": "Password reset link has been issued."
                     }
-                  },
-                  "generic": {
-                    "value": {
-                      "success": true,
-                      "message": "If the email exists, a reset link was sent."
-                    }
                   }
                 }
               }
@@ -1567,6 +1561,19 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "description": "No user account exists for the supplied email.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "message": "Email is missing from our records."
+                }
+              }
+            }
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"

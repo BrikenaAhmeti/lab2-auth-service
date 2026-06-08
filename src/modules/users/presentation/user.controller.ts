@@ -19,6 +19,10 @@ const internalProfilesSchema = z.object({
     userIds: z.array(z.string().uuid('Invalid user id')).max(100),
 });
 
+const internalProfilesSchema = z.object({
+    userIds: z.array(z.string().uuid('Invalid user id')).max(100),
+});
+
 export class UserController {
     private readonly service = new UserService(
         new UserPrismaRepository(),

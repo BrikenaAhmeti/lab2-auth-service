@@ -28,6 +28,10 @@ function mapAuthUser(user: any): AuthUserView {
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
+        phone: user.phone,
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
+        personalNumber: user.personalNumber,
         passwordHash: user.passwordHash,
         isActive: user.isActive,
         roles: user.userRoles.map((x: any) => x.role.name),
@@ -362,7 +366,6 @@ export class AuthPrismaRepository implements AuthRepository {
         roles: string[];
     }> {
         const created = await prisma.$transaction(async (tx) => {
-            const now = new Date();
             const user = await tx.user.create({
                 data: {
                     firstName: data.firstName,
@@ -374,8 +377,8 @@ export class AuthPrismaRepository implements AuthRepository {
                     dateOfBirth: data.dateOfBirth,
                     gender: data.gender,
                     personalNumber: data.personalNumber,
-                    isActive: true,
-                    emailVerifiedAt: now,
+                    isActive: data.isActive ?? true,
+                    emailVerifiedAt: data.emailVerifiedAt === undefined ? new Date() : data.emailVerifiedAt,
                     createdBy: data.createdBy,
                     updatedBy: data.createdBy,
                 },
