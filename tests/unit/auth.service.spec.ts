@@ -84,10 +84,12 @@ function createMocks() {
 
 describe('AuthService', () => {
     const defaultEmailVerificationUrl = env.emailVerificationUrl;
+    const defaultPasswordResetUrl = env.passwordResetUrl;
 
     beforeEach(() => {
         jest.clearAllMocks();
         env.emailVerificationUrl = defaultEmailVerificationUrl;
+        env.passwordResetUrl = defaultPasswordResetUrl;
     });
 
     const activeSession = {
@@ -529,6 +531,7 @@ describe('AuthService', () => {
     });
 
     it('requests and completes password reset', async () => {
+        env.passwordResetUrl = 'http://localhost:3001/reset-password';
         const m = createMocks();
         const service = new AuthService(
             m.userRepository,
@@ -553,6 +556,9 @@ describe('AuthService', () => {
         });
         expect(requestResult.success).toBe(true);
         expect(m.emailService.send).toHaveBeenCalled();
+        expect(m.emailService.send.mock.calls[0][0].text).toContain(
+            'http://localhost:3001/reset-password?token=',
+        );
 
         m.authRepository.findValidPasswordResetToken.mockResolvedValue({
             id: 'prt1',
@@ -574,6 +580,33 @@ describe('AuthService', () => {
             'u9',
             'new-hashed-password',
         );
+    });
+
+    it('rejects password reset requests when the email is missing', async () => {
+        const m = createMocks();
+        const service = new AuthService(
+            m.userRepository,
+            m.authRepository,
+            m.passwordService as any,
+            m.jwtService as any,
+            m.tokenHashService as any,
+            m.auditLogService as any,
+            m.emailService,
+        );
+
+        m.userRepository.findByEmail.mockResolvedValue(null);
+
+        await expect(
+            service.requestPasswordReset({
+                email: 'missing@demo.local',
+            }),
+        ).rejects.toMatchObject({
+            message: 'Email is missing from our records.',
+            statusCode: 404,
+        });
+
+        expect(m.authRepository.createPasswordResetToken).not.toHaveBeenCalled();
+        expect(m.emailService.send).not.toHaveBeenCalled();
     });
 
     it('returns all active sessions for admins and own sessions for regular users', async () => {

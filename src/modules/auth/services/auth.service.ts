@@ -871,9 +871,11 @@ export class AuthService {
         ipAddress?: string;
         userAgent?: string;
     }) {
-        const user = await this.userRepository.findByEmail(input.email.trim().toLowerCase());
+        const email = input.email.trim().toLowerCase();
+        const user = await this.userRepository.findByEmail(email);
+
         if (!user) {
-            return { success: true, message: 'If the email exists, a reset link was sent.' };
+            throw new AppError('Email is missing from our records.', 404);
         }
 
         await this.authRepository.invalidatePasswordResetTokens(user.id);

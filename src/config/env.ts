@@ -27,7 +27,7 @@ export const env = {
     frontendOrigins,
     emailVerificationUrl:
         process.env.EMAIL_VERIFICATION_URL || `${frontendBaseUrl}/verify-email`,
-    passwordResetUrl: process.env.PASSWORD_RESET_URL || `${appBaseUrl}/reset-password`,
+    passwordResetUrl: process.env.PASSWORD_RESET_URL || `${frontendBaseUrl}/reset-password`,
     emailFrom: process.env.EMAIL_FROM || 'MedSphere <medsphere@noreply.com>',
     coreServiceUrl: process.env.CORE_SERVICE_URL || '',
     internalApiKey: process.env.INTERNAL_API_KEY || '',
