@@ -304,7 +304,7 @@ export class AuthService {
     }
 
     private async linkPatientProfileForVerifiedUser(userId: string) {
-        const user = await this.userRepository.findById(userId);
+        const user = await this.authRepository.getUserAuthById(userId);
         await this.linkPatientProfileForUser(user);
     }
 
