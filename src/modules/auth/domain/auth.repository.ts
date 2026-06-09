@@ -50,6 +50,7 @@ export interface SessionUserView {
     username?: string | null;
     firstName: string;
     lastName: string;
+    personalNumber?: string | null;
 }
 
 export interface ActiveSessionView {

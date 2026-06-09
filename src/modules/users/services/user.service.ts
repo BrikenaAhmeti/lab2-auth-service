@@ -13,6 +13,11 @@ export class UserService {
         return publicProfile;
     }
 
+    private toOwnProfile(user: any) {
+        const { passwordHash, ...ownProfile } = user;
+        return ownProfile;
+    }
+
     private toInternalProfile(user: any) {
         const roles = (user.userRoles ?? [])
             .map((entry: any) => entry.role?.name)
@@ -40,7 +45,7 @@ export class UserService {
             throw new AppError('User not found', 404);
         }
 
-        return this.toPublicProfile(user);
+        return this.toOwnProfile(user);
     }
 
     async getDoctors() {
@@ -121,6 +126,6 @@ export class UserService {
             userAgent: data.userAgent,
         });
 
-        return this.toPublicProfile(updated);
+        return this.toOwnProfile(updated);
     }
 }

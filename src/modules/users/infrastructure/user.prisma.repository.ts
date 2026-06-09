@@ -12,6 +12,12 @@ export class UserPrismaRepository implements UserRepository {
         });
     }
 
+    async deleteById(id: string): Promise<void> {
+        await prisma.user.delete({
+            where: { id },
+        });
+    }
+
     async findById(id: string): Promise<any | null> {
         return prisma.user.findUnique({
             where: { id },

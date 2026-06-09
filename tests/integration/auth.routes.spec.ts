@@ -37,6 +37,7 @@ describe('Auth routes', () => {
                     username: 'admin',
                     firstName: 'System',
                     lastName: 'Admin',
+                    personalNumber: null,
                     roles: ['Super Admin'],
                     permissions: ['users:read:all'],
                 },
@@ -151,8 +152,68 @@ describe('Auth routes', () => {
         expect(response.body.success).toBe(true);
         expect(resetSpy).toHaveBeenCalledWith(
             expect.objectContaining({
-                token: 'raw-reset-code',
+                code: 'raw-reset-code',
                 newPassword: 'ChangedPass123!',
+            }),
+        );
+    });
+
+    it('passes mobile platform from forgot-password query and header', async () => {
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+
+        const forgotSpy = jest
+            .spyOn(AuthService.prototype, 'requestPasswordReset')
+            .mockResolvedValue({
+                success: true,
+                message: 'Password reset code has been issued.',
+            });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const response = await request(app)
+            .post('/api/auth/forgot-password?platform=mobile')
+            .set('X-Client-Platform', 'mobile')
+            .send({
+                email: 'patient@demo.local',
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.message).toBe('Password reset code has been issued.');
+        expect(forgotSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                email: 'patient@demo.local',
+                platform: 'mobile',
+            }),
+        );
+    });
+
+    it('uses reset code flow even when forgot-password is called as web', async () => {
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+
+        const forgotSpy = jest
+            .spyOn(AuthService.prototype, 'requestPasswordReset')
+            .mockResolvedValue({
+                success: true,
+                message: 'Password reset code has been issued.',
+            });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const response = await request(app)
+            .post('/api/auth/forgot-password')
+            .send({
+                email: 'patient@demo.local',
+                platform: 'web',
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.message).toBe('Password reset code has been issued.');
+        expect(forgotSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                email: 'patient@demo.local',
+                platform: 'web',
             }),
         );
     });
@@ -245,6 +306,32 @@ describe('Auth routes', () => {
         expect(response.body.success).toBe(true);
         expect(verifySpy).toHaveBeenCalledWith(
             expect.objectContaining({ token: 'raw-token' }),
+        );
+    });
+
+    it('accepts mobile verify-email payload with code field', async () => {
+        const { AuthService } = await import('../../src/modules/auth/services/auth.service');
+
+        const verifySpy = jest
+            .spyOn(AuthService.prototype, 'verifyEmail')
+            .mockResolvedValue({
+                success: true,
+                message: 'Email verified successfully.',
+            });
+
+        const { createApp } = await import('../../src/app');
+        const app = createApp();
+
+        const response = await request(app)
+            .post('/api/auth/verify-email')
+            .send({
+                code: '123456',
+            });
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+        expect(verifySpy).toHaveBeenCalledWith(
+            expect.objectContaining({ code: '123456' }),
         );
     });
 

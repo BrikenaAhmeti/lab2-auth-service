@@ -22,6 +22,10 @@ export class AuthService {
         private readonly patientProfileLinker?: PatientProfileLinker,
     ) { }
 
+    private isMobilePlatform(platform?: string | null) {
+        return platform?.trim().toLowerCase() === 'mobile';
+    }
+
     private assertPasswordComplexity(password: string) {
         const complexity =
             /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,100}$/;
@@ -130,6 +134,7 @@ export class AuthService {
             username: user.username,
             firstName: user.firstName,
             lastName: user.lastName,
+            personalNumber: user.personalNumber ?? null,
             roles: user.roles,
             permissions: user.permissions,
             ...patientProfile,
@@ -179,17 +184,18 @@ export class AuthService {
         return normalized;
     }
 
-    private createOneTimeToken(hoursToExpire: number) {
-        const rawToken = crypto.randomBytes(32).toString('hex');
-        const tokenHash = this.tokenHashService.hash(rawToken);
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + hoursToExpire);
+    private normalizePasswordResetCode(code?: string | null) {
+        const normalized = code?.trim();
 
-        return { rawToken, tokenHash, expiresAt };
+        if (!normalized || !/^\d{6}$/.test(normalized)) {
+            throw new AppError('Reset code must be 6 digits', 400);
+        }
+
+        return normalized;
     }
 
     private createEmailVerificationToken(minutesToExpire: number) {
-        const rawToken = crypto.randomBytes(32).toString('hex');
+        const rawToken = crypto.randomInt(100000, 1000000).toString();
         const tokenHash = this.tokenHashService.hash(rawToken);
         const expiresAt = new Date();
         expiresAt.setMinutes(expiresAt.getMinutes() + minutesToExpire);
@@ -197,8 +203,17 @@ export class AuthService {
         return { rawToken, tokenHash, expiresAt };
     }
 
-    private hashEmailVerificationCode(userId: string, code: string) {
-        return this.tokenHashService.hash(`${userId}:${code}`);
+    private createOneTimeCode(minutesToExpire: number) {
+        const rawToken = crypto.randomInt(100000, 1000000).toString();
+        const tokenHash = this.tokenHashService.hash(rawToken);
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + minutesToExpire);
+
+        return { rawToken, tokenHash, expiresAt };
+    }
+
+    private hashEmailVerificationCode(_userId: string, code: string) {
+        return this.tokenHashService.hash(code);
     }
 
     private buildTokenUrl(baseUrl: string, token: string) {
@@ -207,7 +222,27 @@ export class AuthService {
         return url.toString();
     }
 
-    private async sendVerificationEmail(email: string, token: string) {
+    private async sendVerificationEmail(email: string, token: string, options: { platform?: string } = {}) {
+        if (this.isMobilePlatform(options.platform)) {
+            await this.emailService.send({
+                to: email,
+                subject: 'Verify your MedSphere account',
+                text: [
+                    'Your MedSphere verification code is:',
+                    token,
+                    'Enter this code in the mobile app to verify your account.',
+                    'This code expires in 15 minutes.',
+                ].join('\n\n'),
+                html: [
+                    '<p>Your MedSphere verification code is:</p>',
+                    `<p><strong>${this.escapeHtml(token)}</strong></p>`,
+                    '<p>Enter this code in the mobile app to verify your account.</p>',
+                    '<p>This code expires in 15 minutes.</p>',
+                ].join(''),
+            });
+            return;
+        }
+
         const verificationUrl = this.buildTokenUrl(env.emailVerificationUrl, token);
         await this.emailService.send({
             to: email,
@@ -227,12 +262,21 @@ export class AuthService {
     }
 
     private async sendPasswordResetEmail(email: string, token: string) {
-        const resetUrl = this.buildTokenUrl(env.passwordResetUrl, token);
         await this.emailService.send({
             to: email,
-            subject: 'Reset your MedSphere password',
-            text: `Reset your MedSphere password by opening: ${resetUrl}`,
-            html: `<p>Reset your MedSphere password by opening <a href="${resetUrl}">${resetUrl}</a>.</p>`,
+            subject: 'Your MedSphere reset code',
+            text: [
+                'Your password reset code is:',
+                token,
+                'Enter this code in the mobile app to reset your password.',
+                'This code expires in 15 minutes.',
+            ].join('\n\n'),
+            html: [
+                '<p>Your password reset code is:</p>',
+                `<p><strong>${this.escapeHtml(token)}</strong></p>`,
+                '<p>Enter this code in the mobile app to reset your password.</p>',
+                '<p>This code expires in 15 minutes.</p>',
+            ].join(''),
         });
     }
 
@@ -327,31 +371,76 @@ export class AuthService {
         await this.patientProfileLinker.linkByPersonalNumber(this.patientProfileLinkPayload(user));
     }
 
-    private async tryLinkPatientProfileDuringRegistration(
-        user: Pick<
-            AuthUserView,
-            'id' | 'firstName' | 'lastName' | 'email' | 'phone' | 'dateOfBirth' | 'gender' | 'personalNumber'
-        > | null | undefined,
+    private async cleanupRegisteredUser(
+        userId: string,
         context: { ipAddress?: string; userAgent?: string },
+        reason: unknown,
     ) {
         try {
-            await this.linkPatientProfileForUser(user);
-        } catch (error) {
+            await this.userRepository.deleteById(userId);
+        } catch (cleanupError) {
             try {
                 await this.auditLogService.log({
-                    userId: user?.id,
-                    action: 'patient.profile.sync.failed',
-                    entity: 'patient',
-                    entityId: user?.id,
+                    userId,
+                    action: 'user.registration.cleanup.failed',
+                    entity: 'user',
+                    entityId: userId,
                     newValue: {
-                        phase: 'registration',
-                        reason: error instanceof Error ? error.message : 'Unknown error',
+                        reason: reason instanceof Error ? reason.message : 'Unknown error',
+                        cleanupReason: cleanupError instanceof Error
+                            ? cleanupError.message
+                            : 'Unknown cleanup error',
                     },
                     ipAddress: context.ipAddress,
                     userAgent: context.userAgent,
                 });
             } catch {
                 return;
+            }
+        }
+    }
+
+    private async logPatientProfileSyncFailure(
+        user: Pick<
+            AuthUserView,
+            'id' | 'firstName' | 'lastName' | 'email' | 'phone' | 'dateOfBirth' | 'gender' | 'personalNumber'
+        > | null | undefined,
+        context: { ipAddress?: string; userAgent?: string },
+        error: unknown,
+    ) {
+        try {
+            await this.auditLogService.log({
+                userId: user?.id,
+                action: 'patient.profile.sync.failed',
+                entity: 'patient',
+                entityId: user?.id,
+                newValue: {
+                    phase: 'registration',
+                    reason: error instanceof Error ? error.message : 'Unknown error',
+                },
+                ipAddress: context.ipAddress,
+                userAgent: context.userAgent,
+            });
+        } catch {
+            return;
+        }
+    }
+
+    private async linkPatientProfileDuringRegistration(
+        user: Pick<
+            AuthUserView,
+            'id' | 'firstName' | 'lastName' | 'email' | 'phone' | 'dateOfBirth' | 'gender' | 'personalNumber'
+        > | null | undefined,
+        context: { ipAddress?: string; userAgent?: string },
+        options: { required: boolean },
+    ) {
+        try {
+            await this.linkPatientProfileForUser(user);
+        } catch (error) {
+            await this.logPatientProfileSyncFailure(user, context, error);
+
+            if (options.required) {
+                throw error;
             }
         }
     }
@@ -454,6 +543,7 @@ export class AuthService {
         gender?: string;
         personalNumber: string;
         username?: string;
+        platform?: string;
         ipAddress?: string;
         userAgent?: string;
     }) {
@@ -482,6 +572,15 @@ export class AuthService {
         this.assertPasswordComplexity(input.password);
         const passwordHash = await this.passwordService.hash(input.password);
 
+        const patientRoles = await this.authRepository.findRolesByNames(['Patient']);
+        if (patientRoles.length !== 1) {
+            throw new AppError('Patient role is not configured', 500);
+        }
+
+        const context = {
+            ipAddress: input.ipAddress,
+            userAgent: input.userAgent,
+        };
         const user = await this.userRepository.create({
             firstName: input.firstName.trim(),
             lastName: input.lastName.trim(),
@@ -496,23 +595,46 @@ export class AuthService {
             emailVerifiedAt: null,
         });
 
-        const patientRoles = await this.authRepository.findRolesByNames(['Patient']);
-        if (patientRoles.length !== 1) {
-            throw new AppError('Patient role is not configured', 500);
-        }
-        await this.authRepository.assignRolesToUser(user.id, [patientRoles[0].id]);
-        await this.tryLinkPatientProfileDuringRegistration(user, {
-            ipAddress: input.ipAddress,
-            userAgent: input.userAgent,
-        });
-
         const verification = this.createEmailVerificationToken(15);
-        await this.authRepository.createEmailVerificationToken({
-            userId: user.id,
-            tokenHash: verification.tokenHash,
-            expiresAt: verification.expiresAt,
-        });
-        await this.sendVerificationEmail(user.email, verification.rawToken);
+        try {
+            await this.authRepository.assignRolesToUser(user.id, [patientRoles[0].id]);
+            await this.authRepository.createEmailVerificationToken({
+                userId: user.id,
+                tokenHash: verification.tokenHash,
+                expiresAt: verification.expiresAt,
+            });
+        } catch (error) {
+            await this.cleanupRegisteredUser(user.id, context, error);
+            throw error;
+        }
+
+        try {
+            await this.linkPatientProfileDuringRegistration(user, context, {
+                required: this.isMobilePlatform(input.platform),
+            });
+        } catch (error) {
+            await this.cleanupRegisteredUser(user.id, context, error);
+
+            throw new AppError(
+                error instanceof AppError
+                    ? error.message
+                    : 'Patient profile could not be created. Please try again.',
+                error instanceof AppError ? error.statusCode : 502,
+            );
+        }
+
+        let emailDeliveryWarning: string | undefined;
+        try {
+            await this.sendVerificationEmail(user.email, verification.rawToken, {
+                platform: input.platform,
+            });
+        } catch (error) {
+            if (env.nodeEnv === 'production') {
+                throw error;
+            }
+
+            emailDeliveryWarning = 'Verification email could not be sent outside production.';
+        }
 
         await this.auditLogService.log({
             userId: user.id,
@@ -530,15 +652,24 @@ export class AuthService {
         });
 
         return {
-            message: 'Registration successful. Check your email for the verification link to activate the account.',
+            message: this.isMobilePlatform(input.platform)
+                ? 'Registration successful. Check your email for the verification code to activate the account.'
+                : 'Registration successful. Check your email for the verification link to activate the account.',
             user: {
                 id: user.id,
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
                 username: user.username,
+                personalNumber: user.personalNumber ?? null,
                 isActive: user.isActive,
             },
+            ...(emailDeliveryWarning
+                ? {
+                    devVerificationCode: verification.rawToken,
+                    emailDeliveryWarning,
+                }
+                : {}),
         };
     }
 
@@ -896,6 +1027,11 @@ export class AuthService {
             verificationToken = await this.authRepository.findValidEmailVerificationToken(
                 this.hashEmailVerificationCode(user.id, code),
             );
+        } else if (input.code) {
+            const code = this.normalizeVerificationCode(input.code);
+            verificationToken = await this.authRepository.findValidEmailVerificationToken(
+                this.tokenHashService.hash(code),
+            );
         } else if (input.token) {
             const tokenHash = this.tokenHashService.hash(input.token);
             verificationToken =
@@ -924,13 +1060,14 @@ export class AuthService {
 
     async resendVerificationEmail(input: {
         email: string;
+        platform?: string;
         ipAddress?: string;
         userAgent?: string;
     }) {
         const user = await this.userRepository.findByEmail(input.email.trim().toLowerCase());
 
         if (!user) {
-            return { success: true, message: 'If the email exists, a verification link was sent.' };
+            return { success: true, message: 'If the email exists, verification instructions were sent.' };
         }
 
         if (user.emailVerifiedAt) {
@@ -945,7 +1082,9 @@ export class AuthService {
             tokenHash: verification.tokenHash,
             expiresAt: verification.expiresAt,
         });
-        await this.sendVerificationEmail(user.email, verification.rawToken);
+        await this.sendVerificationEmail(user.email, verification.rawToken, {
+            platform: input.platform,
+        });
 
         await this.auditLogService.log({
             userId: user.id,
@@ -958,12 +1097,15 @@ export class AuthService {
 
         return {
             success: true,
-            message: 'Verification link has been re-issued.',
+            message: this.isMobilePlatform(input.platform)
+                ? 'Verification code has been re-issued.'
+                : 'Verification link has been re-issued.',
         };
     }
 
     async requestPasswordReset(input: {
         email: string;
+        platform?: string;
         ipAddress?: string;
         userAgent?: string;
     }) {
@@ -976,7 +1118,7 @@ export class AuthService {
 
         await this.authRepository.invalidatePasswordResetTokens(user.id);
 
-        const reset = this.createOneTimeToken(1);
+        const reset = this.createOneTimeCode(15);
         await this.authRepository.createPasswordResetToken({
             userId: user.id,
             tokenHash: reset.tokenHash,
@@ -995,22 +1137,39 @@ export class AuthService {
 
         return {
             success: true,
-            message: 'Password reset link has been issued.',
+            message: 'Password reset code has been issued.',
         };
     }
 
     async resetPassword(input: {
-        token: string;
+        token?: string;
+        code?: string;
+        email?: string;
         newPassword: string;
         ipAddress?: string;
         userAgent?: string;
     }) {
         this.assertPasswordComplexity(input.newPassword);
 
-        const tokenHash = this.tokenHashService.hash(input.token);
+        const rawResetSecret = input.code
+            ? this.normalizePasswordResetCode(input.code)
+            : input.token?.trim();
+
+        if (!rawResetSecret) {
+            throw new AppError('Invalid or expired reset token or code', 400);
+        }
+
+        const tokenHash = this.tokenHashService.hash(rawResetSecret);
         const resetToken = await this.authRepository.findValidPasswordResetToken(tokenHash);
         if (!resetToken) {
-            throw new AppError('Invalid or expired reset token', 400);
+            throw new AppError('Invalid or expired reset token or code', 400);
+        }
+
+        if (input.email) {
+            const user = await this.userRepository.findByEmail(input.email.trim().toLowerCase());
+            if (!user || user.id !== resetToken.userId) {
+                throw new AppError('Invalid or expired reset token or code', 400);
+            }
         }
 
         const passwordHash = await this.passwordService.hash(input.newPassword);

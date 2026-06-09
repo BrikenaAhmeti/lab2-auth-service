@@ -25,7 +25,7 @@ describe('UserService', () => {
         jest.clearAllMocks();
     });
 
-    it('does not expose password hash or personal number in current profile', async () => {
+    it('returns personal number but not password hash in current profile', async () => {
         const m = createMocks();
         const service = new UserService(m.userRepository, m.auditLogService as any);
 
@@ -46,13 +46,13 @@ describe('UserService', () => {
             email: 'patient@medsphere.local',
             firstName: 'Arta',
             lastName: 'Patient',
+            personalNumber: '1234567890',
             isActive: true,
         });
         expect(result).not.toHaveProperty('passwordHash');
-        expect(result).not.toHaveProperty('personalNumber');
     });
 
-    it('does not expose password hash or personal number after profile update', async () => {
+    it('returns personal number but not password hash after profile update', async () => {
         const m = createMocks();
         const service = new UserService(m.userRepository, m.auditLogService as any);
 
@@ -79,9 +79,9 @@ describe('UserService', () => {
             id: 'u1',
             firstName: 'Arta',
             lastName: 'Updated',
+            personalNumber: '1234567890',
         });
         expect(result).not.toHaveProperty('passwordHash');
-        expect(result).not.toHaveProperty('personalNumber');
     });
 
     it('returns internal profiles in requested order without sensitive fields', async () => {

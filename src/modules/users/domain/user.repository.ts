@@ -28,6 +28,7 @@ export interface UpdateMyProfileData {
 
 export interface UserRepository {
     create(data: CreateUserData): Promise<any>;
+    deleteById(id: string): Promise<void>;
     findById(id: string): Promise<any | null>;
     findByIds(ids: string[]): Promise<any[]>;
     findByEmail(email: string): Promise<any | null>;

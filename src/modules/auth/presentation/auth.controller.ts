@@ -19,6 +19,8 @@ const usernameSchema = z
     .regex(/^[A-Za-z0-9._-]+$/)
     .optional();
 
+const platformSchema = z.enum(['web', 'mobile']).optional();
+
 const registerSchema = z.object({
     firstName: z.string().min(2).max(100),
     lastName: z.string().min(2).max(100),
@@ -29,6 +31,7 @@ const registerSchema = z.object({
     dateOfBirth: z.string().optional(),
     gender: z.string().optional(),
     personalNumber: z.string().trim().min(1).max(50),
+    platform: platformSchema,
 });
 
 const loginSchema = z.object({
@@ -46,8 +49,8 @@ const verifyEmailSchema = z
         email: z.email().optional(),
         code: z.string().trim().regex(/^\d{6}$/).optional(),
     })
-    .refine((value) => Boolean(value.token || (value.email && value.code)), {
-        message: 'Provide either token or email and code',
+    .refine((value) => Boolean(value.token || value.code || (value.email && value.code)), {
+        message: 'Provide either token or verification code',
         path: ['code'],
     });
 
@@ -57,16 +60,30 @@ const verifyEmailQuerySchema = z.object({
 
 const resendVerificationSchema = z.object({
     email: z.email(),
+    platform: platformSchema,
 });
 
 const forgotPasswordSchema = z.object({
     email: z.email(),
+    platform: platformSchema,
 });
 
-const resetPasswordSchema = z.object({
-    token: z.string().min(1),
-    newPassword: z.string().min(12).max(100),
-});
+const resetPasswordSchema = z
+    .object({
+        token: z.string().trim().min(1).optional(),
+        code: z.string().trim().min(1).optional(),
+        email: z.email().optional(),
+        newPassword: z.string().min(12).max(100).optional(),
+        password: z.string().min(12).max(100).optional(),
+    })
+    .refine((value) => Boolean(value.token || value.code), {
+        message: 'Provide either token or reset code',
+        path: ['code'],
+    })
+    .refine((value) => Boolean(value.newPassword || value.password), {
+        message: 'Password is required',
+        path: ['password'],
+    });
 
 const logoutSchema = z.object({
     refreshToken: z.string().min(1),
@@ -137,6 +154,25 @@ function parseQueryDate(value?: string) {
     return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+function normalizePlatform(value: unknown) {
+    const rawValue = Array.isArray(value) ? value[0] : value;
+
+    if (typeof rawValue !== 'string') {
+        return undefined;
+    }
+
+    const normalized = rawValue.trim().toLowerCase();
+    return normalized === 'mobile' || normalized === 'web' ? normalized : undefined;
+}
+
+function resolveClientPlatform(req: Request, bodyPlatform?: 'web' | 'mobile') {
+    return (
+        bodyPlatform ??
+        normalizePlatform(req.query.platform) ??
+        normalizePlatform(req.headers['x-client-platform'])
+    );
+}
+
 export class AuthController {
     private readonly service = new AuthService(
         new UserPrismaRepository(),
@@ -162,6 +198,7 @@ export class AuthController {
             dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
             gender: body.gender,
             personalNumber: body.personalNumber,
+            platform: body.platform,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
         });
@@ -227,6 +264,7 @@ export class AuthController {
 
         const result = await this.service.resendVerificationEmail({
             email: body.email,
+            platform: resolveClientPlatform(req, body.platform),
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
         });
@@ -253,6 +291,7 @@ export class AuthController {
 
         const result = await this.service.requestPasswordReset({
             email: body.email,
+            platform: resolveClientPlatform(req, body.platform),
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
         });
@@ -265,7 +304,9 @@ export class AuthController {
 
         const result = await this.service.resetPassword({
             token: body.token,
-            newPassword: body.newPassword,
+            code: body.code,
+            email: body.email,
+            newPassword: body.newPassword ?? body.password!,
             ipAddress: req.ip,
             userAgent: req.headers['user-agent'],
         });
